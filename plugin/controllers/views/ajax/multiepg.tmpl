@@ -23,12 +23,13 @@
 	#navepg { margin-bottom: 1px; }
 #if $mode == 1
 	#tbl1 thead td { position: sticky; top: 0; z-index: 10; }
+	#tbl1 tfoot td { position: sticky; bottom: 0; z-index: 10; }
 	.wrapper { overflow: auto; width: 100%; -ms-overflow-style: -ms-autohiding-scrollbar;}
 #else
-	#tbl1 thead tr, #tbl1 tfoot tr { display: block; width: 100%; }
-	#tbl1 tbody { width: 100%; height: 100%; overflow-y: auto; display: block; overflow-x: hidden;}
 	.wrapper { overflow: auto; width: 100%; -ms-overflow-style: -ms-autohiding-scrollbar;}
-	.channel-listing > li > span { position: sticky !important; left: 0; z-index: 10; background-color: inherit; }
+	.timeline-channels { position: sticky; left: 0; z-index: 10; float: left; width: 140px; }
+	.timeline-channel { width: 140px; height: 50px; display: flex; align-items: center; justify-content: center; text-align: center; box-sizing: border-box; }
+	.timeline-events { margin-left: 140px; width: 30000px; }
 #end if
 	.ui-widget-content.nobg , .ui-widget-header.nobg{ background-image: none; } 
 	td.border { width: 190px; }
@@ -105,16 +106,18 @@
 #if $mode == 2
 
 <style>
-.picon { display: inline-block; margin:0; max-width: 100px;}
-.picon > img { max-height: 30px;}
+.picon { display: block; margin: 0 auto; max-width: 100px; text-align: center; }
+.picon > img { max-height: 30px; display: inline-block; }
+.timeline-channel > div { vertical-align: middle; width: 100%; text-align: center; }
+.timeline-channel > div > span { font-size: 10px; display: block; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; }
 
-.eventlist { display: inline-block; list-style-type: none; margin: 0px; padding: 1px 0px; width: calc(100% - 105px); }
-.event { display: block; position: relative; vertical-align: top; clear: left; border: none; }
-.event a,.event > span { padding: 0 0 0 10px; height:48px; width:100%; display: block; white-space: normal; overflow: hidden; }
+.eventlist { position: relative; display: block; list-style-type: none; margin: 0px; padding: 0px; width: 30000px; height: 50px; }
+.event { position: absolute; top: 0; display: block; vertical-align: top; border: none; height: 50px; box-sizing: border-box; }
+.event a,.event > span { padding: 0 0 0 10px; height:48px; width:100%; display: block; white-space: normal; overflow: hidden; box-sizing: border-box; }
 .event a:link:hover { text-decoration: none; }
-.ename { display: block; width: 100%; float: left; font-weight: 200; line-height: 1,4; font-size: 14px; }
-.etime,.etimer  { display: inline-block; padding-right: 20px; font-weight: 200; line-height: 1,4; font-size: 12px; }
-.event { display: inline-block; border-width: 0px 0px 0px 1px; }
+.ename { display: block; width: 100%; float: left; font-weight: 200; line-height: 1.4; font-size: 14px; }
+.etime,.etimer  { display: inline-block; padding-right: 20px; font-weight: 200; line-height: 1.4; font-size: 12px; }
+.event { border-width: 0px 0px 0px 1px; }
 .event .ename,.event .etime,.event .etimer { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
 
@@ -165,70 +168,55 @@
 #else
 <div class="wrapper">
 <div id="tbl1body" style="position: relative; width: 100%;">
-	<div id="tblinner" style="height: auto;width: 100%; white-space: nowrap;">
+	<div id="tblinner" style="height: auto; width: 30140px; min-width: 30140px; position: relative; white-space: nowrap;">
 	<div class="timetable">
 	<div>
 	<div class="timetable-now"></div>
 	</div>
 	</div>
 
-	<ol id="timescroller" class="channel-listing ui-widget-header nobg" style="border:none;">
-		<li>
-			<span>
-				<div class="togglescroll ui-widget-header">
-					<span class="picon"></span>
-					<span></span>
-				</div>
-			</span>
-			<ol cass="eventlist">
-				#set pad = 141
-				<li class="event" style="width:${pad}px;">
-				</li>
+	<div class="timeline-channels">
+		<div class="timeline-channel ui-widget-header">
+			<div class="togglescroll">
+				<span class="picon"></span>
+				<span></span>
+			</div>
+		</div>
+	#for $sname, $eventlist in $events.items()
+		#set $ref = $channelrefs.get($sname, "")
+		#set $qref = $quote($ref, safe=' ~@#$()*!+=:;,.?/\'').replace('%253a//','%3a//')
+		<div class="timeline-channel ui-widget-header" data-sref="$ref" data-ref="$qref">
+			<div>
+				<span class="picon"><img src="$(picons[$sname])" alt="" onerror="this.style.display='none'" /></span>
+				<span>$(channelnames[$sname])</span>
+			</div>
+		</div>
+	#end for
+	</div>
+
+	<div class="timeline-events">
+		<ol id="timescroller" class="eventlist ui-widget-header nobg" style="border:none;">
 				#for $slot in list(range(0,50))
 					#set $t = $first + ($slot * 3600)
-					<li class="event" style="width:600px;" data-dt="$strftime("%H:%M", $localtime($t))">
+					<li class="event" style="left:${slot * 600}px;width:600px;" data-dt="$strftime("%H:%M", $localtime($t))">
 						<span class="ui-widget-header nobg">
 							<span class="ename">$tstrings[("day_" + ($strftime("%w",$localtime($t))))], $strftime('%d.%m.', $localtime($t))</span>
 							<span class="etime">$strftime("%H:%M", $localtime($t))</span>
 						</span>
 					</li>
 				#end for
-			</ol>
-		</li>
-	</ol>
+		</ol>
 
 	#for $sname, $eventlist in $events.items()
 	#set $ref = $channelrefs.get($sname, "")
 	#set $qref = $quote($ref, safe=' ~@#$()*!+=:;,.?/\'').replace('%253a//','%3a//')
-		<ol class="channel-listing" data-sref="$ref" data-ref="$qref">
-			<li>
-				<span class="ui-widget-header">
-					<div>
-						<span class="picon"><img src="$(picons[$sname])" alt="" onerror="this.style.display='none'" /></span>
-						<span>$(channelnames[$sname])</span>
-					</div>
-				</span>
-				<ol cass="eventlist">
-					#set $c=0
-					#set $ref = ''
+		<ol class="eventlist channel-listing" data-sref="$ref" data-ref="$qref">
+					#set $ref = $qref
 					#for $event in $eventlist[0]
-					#set pad = 0
-					#set $dur = $event.duration
-					#if $c == 0
-						#set $ref = quote(event['ref'], safe=' ~@#$()*!+=:;,.?/\'').replace('%253a//','%3a//')
-						#if $event.begin_timestamp < $first
-							#set pad = 141
-							#set $dur = ($event.begin_timestamp + $event.duration - $first)
-							#if $dur < 0
-								#set $dur = 0
-							#end if
-						#else
-							#set pad = 141 + ($event.begin_timestamp - $first) / 6
-						#end if
-						<li class="event" style="width:${pad}px;">
-						</li>
-					#end if
+					#set $event_start = max($event.begin_timestamp, $first)
 					#set $end = $event.begin_timestamp + $event.duration
+					#set $event_left = max(0, ($event_start - $first) / 6)
+					#set $event_width = max(0, ($end - $event_start) / 6)
 					#set $iscurr = ""
 					#if $event.begin_timestamp <= $now and $end > $now
 						#set $iscurr = " ui-state-hover curevent"
@@ -236,7 +224,7 @@
 					#if $event['timerStatus'] != ''
 						#set $iscurr = $iscurr + " ui-state-hover"
 					#end if
-					<li class="event" data-ref="$ref" data-id="${event.id}" style="width:${dur/6}px;" >
+					<li class="event" data-ref="$ref" data-id="${event.id}" style="left:${event_left}px;width:${event_width}px;" >
 						<a href="#" class="ui-widget-content ${iscurr}" title="$event['title']">
 						<span class="ename">$event['title']</span>
 						<span class="etime">$strftime("%H:%M", $localtime($event['begin_timestamp']))</span>
@@ -246,12 +234,10 @@
 						#end if
 						</a>
 					</li>
-					#set $c = $c + 1
 					#end for
-				</ol>
-			</li>
 		</ol>
 	#end for
+	</div>
 </div>
 #end if
 </div>
@@ -267,14 +253,14 @@ if (pos>0)
 
 #if $day == 0
 
-\$(".timetable-now").css('left', 141 + pos);
+\$(".timetable-now").css('left', 140 + pos);
 
 setTimeout(function() {
 	var nowdate = Math.round(+new Date()/1000);
 	var pos = (nowdate - opena);
 	if(pos > 0)
 		pos = pos / 6;
-	\$(".timetable-now").css('left', 141 + pos);
+	\$(".timetable-now").css('left', 140 + pos);
 } ,10000);
 
 \$(".timetable-now").css('height', \$("#tblinner").height());
@@ -354,11 +340,11 @@ fixTableHeight();
 				var l = \$(".timetable-now").css('left');
 				pos = parseInt(l.replace('px','')) || 0;
 			} else if (d == 1) {
-				pos = 141 + (6 * 3600 / 6);
+				pos = 140 + (6 * 3600 / 6);
 			} else if (d == 2) {
-				pos = 141 + (12 * 3600 / 6);
+				pos = 140 + (12 * 3600 / 6);
 			} else if (d == 3) {
-				pos = 141 + (20 * 3600 / 6);
+				pos = 140 + (20 * 3600 / 6);
 			}
 			
 			if (pos > 0) {
@@ -492,8 +478,8 @@ function autoJumpTimeline() {
 		if (!currEvent.length) {
 			currEvent = \$('.curevent, .ui-state-hover').first().closest('.event');
 		}
-		if (currEvent.length && currEvent.position()) {
-			targetX = currEvent.position().left;
+		if (currEvent.length && currEvent.offset()) {
+			targetX = currEvent.offset().left - container.offset().left + container.scrollLeft();
 		} else {
 			var l = \$(".timetable-now").css('left');
 			if (l) {
