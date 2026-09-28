@@ -98,21 +98,21 @@
 </style>
 
 <div id="navepg">
+#set $epgdate = $localtime($slot_start)
 <ul class="nav nav-tabs tab--skinned" style="margin-top: -10px;height:auto;">
 #for $slot in list(range(0,7))
 	<li><div class="plusclick navtab-#if $slot==$day then 'active' else 'inactive' #" data-day="$(slot)">$tstrings[("day_" + (time.strftime("%w", time.localtime(time.time()+86400*slot))))]</div></li>
 #end for
-#if $mode == 2
 <li><div class="plusclick lbl">&nbsp;$tstrings['prime_times']:&nbsp;</div></li>
-<li><div id="pt0" class="plusclick navtab-inactive" data-day="201">06:00</div></li>
-<li><div id="pt1" class="plusclick navtab-inactive" data-day="202">12:00</div></li>
-<li><div id="pt2" class="plusclick navtab-inactive" data-day="203">20:00</div></li>
-#if $day == 0
+<li><div id="pt0" class="plusclick navtab-inactive" data-day="201" data-time="$int($mktime(($epgdate.tm_year, $epgdate.tm_mon, $epgdate.tm_mday, 6, 0, 0, -1, -1, -1)))">06:00</div></li>
+<li><div id="pt1" class="plusclick navtab-inactive" data-day="202" data-time="$int($mktime(($epgdate.tm_year, $epgdate.tm_mon, $epgdate.tm_mday, 12, 0, 0, -1, -1, -1)))">12:00</div></li>
+<li><div id="pt2" class="plusclick navtab-inactive" data-day="203" data-time="$int($mktime(($epgdate.tm_year, $epgdate.tm_mon, $epgdate.tm_mday, 20, 0, 0, -1, -1, -1)))">20:00</div></li>
+#if $day == 0 and $week == 0
 		<li><div id="pt3" class="plusclick navtab-inactive">&nbsp;</div>
 <li><div id="pt4" class="plusclick navtab-active" data-day="200">$tstrings['now']</div></li>
 #end if
 
-#else
+#if $mode == 1
 <li><div class="plusclick lbl">&nbsp;$tstrings['cw']:&nbsp;</div></li>
 #for $wk in list(range(0,3))
 	#set $w = $wk + 1000
@@ -453,7 +453,21 @@ jQuery(".plusclick").click(function() {
 		else if (day > 199)
 		{
 			var d = day - 200;
-			var dt = (d==0) ? '' : jQuery(this).html();
+			#if $mode == 1
+			var targetTime = d == 0 ? Date.now() / 1000 : Number(jQuery(this).data('time'));
+			var elapsed = targetTime - $slot_start;
+			var rows = jQuery('#tbl1body tr');
+			var slotIndex = Math.floor(elapsed / 7200);
+			if (slotIndex >= 0 && slotIndex < rows.length) {
+				var container = jQuery('#fulltbl');
+				var row = rows.eq(slotIndex);
+				var headerHeight = jQuery('.serviceheader').first().outerHeight() || 0;
+				var top = row.offset().top - container.offset().top + container.scrollTop() + row.outerHeight() * ((elapsed % 7200) / 7200) - headerHeight;
+				container.animate({scrollTop: Math.max(0, top)}, 500);
+			} else if (slotIndex < 0) {
+				jQuery('#fulltbl').animate({scrollTop: 0}, 500);
+			}
+			#else
 			var pos = 0;
 			if (d == 0 || d == '') {
 				var l = jQuery(".timetable-now").css('left');
@@ -470,6 +484,7 @@ jQuery(".plusclick").click(function() {
 				pos -= 160;
 				jQuery('#fulltbl').animate({scrollLeft: Math.max(0, pos)}, 500);
 			}
+			#end if
 		}
 		else if (day > 100)
 		{
