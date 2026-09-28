@@ -30,8 +30,10 @@ from Components.Network import iNetwork
 from Components.SystemInfo import BoxInfo
 from Tools.Directories import isPluginInstalled
 from Plugins.Extensions.OpenWebif import __version__
+from Plugins.Extensions.OpenWebif.build_info import getBuildBranch
 
 OPENWEBIFVER = f"OWIF {__version__}"
+OPENWEBIFBRANCH = getBuildBranch()
 
 PLUGIN_NAME = 'OpenWebif'
 PLUGIN_DESCRIPTION = "OpenWebif Configuration"
