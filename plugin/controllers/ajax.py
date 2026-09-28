@@ -35,7 +35,7 @@ from .models.config import getConfigs, getConfigsSections
 from .models.stream import GetSession, getLive555HlsWebTVBase
 from .base import BaseController
 from .models.locations import getLocations
-from .defaults import OPENWEBIFVER, getPublicPath, VIEWS_PATH, globalVars, EXT_EVENT_INFO_SOURCE
+from .defaults import OPENWEBIFVER, getPublicPath, getViewsPath, VIEWS_PATH, globalVars, EXT_EVENT_INFO_SOURCE
 from .utilities import getUrlArg, getEventInfoProvider
 
 
@@ -328,7 +328,8 @@ class AjaxController(BaseController):
 				mode = int(config.OpenWebif.webcache.mepgmode.value)
 			except ValueError:
 				pass
-		epg = getMultiEpg(self, bref, begintime, endtime, mode)
+		modern = getViewsPath('ajax/multiepg.tmpl').startswith(f'{VIEWS_PATH}/responsive/')
+		epg = getMultiEpg(self, bref, begintime, endtime, mode, modern=modern)
 		epg['bouquets'] = bouq['bouquets']
 		epg['bref'] = bref
 		epg['day'] = day

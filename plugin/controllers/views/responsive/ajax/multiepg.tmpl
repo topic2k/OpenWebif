@@ -59,6 +59,9 @@
     position: relative;
     overflow: visible;
 	}
+	.timer--record { --epg-timer-marker: #e53935; }
+	.timer--zap { --epg-timer-marker: #1e88e5; }
+	.timer--record-zap { --epg-timer-marker: linear-gradient(to bottom, #e53935 50%, #1e88e5 50%); }
 	.epg__event.event--has-timer::after {
 	content: '';
     display: block;
@@ -68,8 +71,10 @@
     bottom: -10%;
     left: -10px;
     position: absolute;
-    border-width: 0 0 0 3px;
-	border-style: solid;
+	width: 3px;
+	border: 0;
+	background: var(--epg-timer-marker);
+	pointer-events: none;
   	}
 	.epg__timer-status .material-icons {
 		font-size: 1.2em;
@@ -157,6 +162,7 @@
 	.timetable-now { position: absolute; top: 0; width: 2px; height: 100%; background-color: #0fb8fb; }
 	.eventlist { display: inline-block; list-style-type: none; margin: 0px; padding: 0px 0px; width: 30000px; }
 	.event { display: block; position: relative; vertical-align: top; clear: left; border: none; }
+	.event.event--has-timer::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--epg-timer-marker); z-index: 7; pointer-events: none; }
 	.event a,.event > span { padding: 0px; height:58px; width:100%; display: block; white-space: normal; overflow: hidden; }
 	.event a:link:hover { text-decoration: none; }
 	.ename { display: block; width: 100%; padding-left:5px; padding-top:10px; float: left; font-weight: 200; line-height: 1,4; font-size: 14px; }
@@ -316,7 +322,11 @@
 	#if $event.begin_timestamp <= $now and $end > $now
 		#set $iscurr = " curevent"
 	#end if
-					<li class="event" data-ref="$ref" data-id="${event.id}" data-toggle="modal" data-target="#EventModal" onclick="loadeventepg('${event.id}', '$ref');return false;" style="width:${dur/6}px;padding:10px;">
+	#set $timerClass = ''
+	#if $event['timer']
+		#set $timerClass = ' event--has-timer timer--' + $event['timer']['markerType']
+	#end if
+					<li class="event$timerClass" data-ref="$ref" data-id="${event.id}" data-toggle="modal" data-target="#EventModal" onclick="loadeventepg('${event.id}', '$ref');return false;" style="width:${dur/6}px;padding:10px;">
 						<a href="javascript:void(0);" class="ui-widget-content ${iscurr}" title="$event['title']">
 							<span class="ename">$event['title']<span class="etimesmall"> ($strftime("%d.%m", $localtime($event['begin_timestamp'])))</span></span>
 							<span class="etime">$strftime("%H:%M", $localtime($event['begin_timestamp'])) - $strftime("%H:%M", $localtime($event['begin_timestamp'] + $event['duration']))</span>

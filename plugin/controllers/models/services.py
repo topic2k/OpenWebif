@@ -1105,7 +1105,7 @@ def getSimilarEpg(ref, eventid, encode=False):
 	return {"events": ret, "result": True}
 
 
-def getMultiEpg(self, ref, begintime=-1, endtime=None, mode=1):
+def getMultiEpg(self, ref, begintime=-1, endtime=None, mode=1, modern=False):
 	# Fill out details for a timer matching an event
 	def getTimerDetails(timer):
 		basicstatus = 'timer'
@@ -1117,17 +1117,21 @@ def getMultiEpg(self, ref, begintime=-1, endtime=None, mode=1):
 			basicstatus = 'timer disabled'
 			isenabled = 0
 		txt = "REC" if timer.justplay == 0 else "ZAP"
-		if timer.justplay == 1 and timer.always_zap == 1:
+		if timer.justplay == 1 and getattr(timer, 'always_zap', False):
 			txt = "R+Z"
 		if isautotimer == 1:
 			txt = "AT"
 		if hasattr(timer, "ice_timer_id") and timer.ice_timer_id:
 			txt = "Ice"
+		marker_type = 'zap' if timer.justplay else 'record'
+		if getattr(timer, 'always_zap', False) or getattr(timer, 'zapbeforerecord', False):
+			marker_type = 'record-zap'
 		timerdetails = {
 				'isEnabled': isenabled,
 				'isZapOnly': int(timer.justplay),
 				'basicStatus': basicstatus,
 				'isAutoTimer': isautotimer,
+				'markerType': marker_type,
 				'text': txt
 			}
 		return timerdetails
@@ -1160,15 +1164,20 @@ def getMultiEpg(self, ref, begintime=-1, endtime=None, mode=1):
 		offset = mktime((bt.tm_year, bt.tm_mon, bt.tm_mday, bt.tm_hour - bt.tm_hour % 2, 0, 0, -1, -1, -1))
 		lastevent = offset + 86399
 
-		# We want to display if an event is covered by a timer.
+		# We want to display if an event has a matching timer.
 		# To keep the costs low for a nested loop against the timer list, we
 		# partition the timers by service reference. For an event we then only
 		# have to check the part of the timers that belong to that specific
 		# service reference. Partition is generated here.
 		timerlist = {}
 		timers = self.session.nav.RecordTimer.timer_list + self.session.nav.RecordTimer.processed_timers
+		timer_start = offset if modern else begintime
 		for timer in timers:
-			if timer.end >= begintime and timer.begin <= lastevent:
+			event_begin = getattr(timer, 'eventBegin', None)
+			if timer.begin <= lastevent and (
+				timer.end >= timer_start or
+				(modern and timer.justplay and event_begin is not None and offset <= event_begin <= lastevent)
+			):
 				if str(timer.service_ref) not in timerlist:
 					timerlist[str(timer.service_ref)] = []
 				timerlist[str(timer.service_ref)].append(timer)
@@ -1192,7 +1201,14 @@ def getMultiEpg(self, ref, begintime=-1, endtime=None, mode=1):
 			timer = None
 			if sref in timerlist and len(timerlist[sref]) > 0:
 				for i, first in enumerate(timerlist[sref]):
-					if first.begin <= event[1] and end - 120 <= first.end:
+					covers_event = first.begin <= event[1] and end - 120 <= first.end
+					event_begin = getattr(first, 'eventBegin', None)
+					short_zap = first.justplay and (
+						event_begin == event[1] or
+						(getattr(first, 'eit', None) and first.eit == event[0]) or
+						(not getattr(first, 'eit', None) and event_begin is None and event[1] <= first.begin < end)
+					)
+					if covers_event or (modern and short_zap):
 						timer = getTimerDetails(first)
 						timerlist[sref] = timerlist[sref][i:]
 						break

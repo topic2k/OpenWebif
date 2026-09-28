@@ -22,7 +22,7 @@ class renderEvtBlock:
 
 		timer = event['timer']
 		if timer:
-			eventcssclass = eventcssclass + ' event--has-timer'
+			eventcssclass = eventcssclass + ' event--has-timer timer--' + timer['markerType']
 			if timer['isEnabled']:
 				timereventsymbol = '<i class="material-icons material-icons-centered">alarm_on</i>'
 			else:
