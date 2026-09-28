@@ -1,4 +1,4 @@
-#from Plugins.Extensions.OpenWebif.controllers.defaults import OPENWEBIFVER, OPENWEBIFPACKAGEVERSION
+#from Plugins.Extensions.OpenWebif.controllers.defaults import OPENWEBIFVER, OPENWEBIFPACKAGEVERSION, OPENWEBIFBRANCH
 #from Plugins.Extensions.OpenWebif.controllers.i18n import tstrings
 
 <div class="col-xs-12">
@@ -92,7 +92,8 @@
               </div>
               <div class="body">
                 <div class="row clearfix" style="text-align: center;">
-                    <p>$OPENWEBIFVER</p>
+                    <p>$OPENWEBIFVER (dev) $OPENWEBIFBRANCH</p>
+                    <p>Branch: $OPENWEBIFBRANCH</p>
                     <p>$tstrings['build']: $OPENWEBIFPACKAGEVERSION</p>
                 </div>
               </div>

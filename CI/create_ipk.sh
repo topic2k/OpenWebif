@@ -33,6 +33,11 @@ EOF
 
 mkdir -p ${P}/usr/lib/enigma2/python/Plugins/Extensions/OpenWebif/
 cp -rp ${D}/plugin/* ${P}/usr/lib/enigma2/python/Plugins/Extensions/OpenWebif/
+BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null)
+rm -f ${P}/usr/lib/enigma2/python/Plugins/Extensions/OpenWebif/build_branch
+if [ -n "$BRANCH" ]; then
+	printf '%s\n' "$BRANCH" > ${P}/usr/lib/enigma2/python/Plugins/Extensions/OpenWebif/build_branch
+fi
 for f in $(find ./locale -name *.po ); do
 	l=$(echo ${f%} | sed 's/\.po//' | sed 's/.*locale\///')
 	mkdir -p ${P}/usr/lib/enigma2/python/Plugins/Extensions/OpenWebif/locale/${l%}/LC_MESSAGES
