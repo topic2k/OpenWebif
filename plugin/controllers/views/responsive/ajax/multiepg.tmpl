@@ -28,6 +28,9 @@
 	#eventdescription { width: 375px; height: auto; position: fixed; top: 205px; left: 350px; z-index: 100; display: none; overflow: auto; }
 	#navepg { margin-bottom: 1px; }
 	#fulltbl { width: 100%; height: 100%; overflow: auto; }
+	#fulltbl.epg__tv-guide { position: relative; }
+	.epg__tv-guide-now { position: absolute; left: 0; height: 2px; z-index: 5; pointer-events: none; background-color: var(--skin-color, #0fb8fb); display: none; }
+	.epg__tv-guide .epg__event { position: relative; z-index: 6; }
 	.notablemargin { margin: 0px;}
 	.ui-widget-content.nobg , .ui-widget-header.nobg{ background-image: none; } 
 	.wrapper { overflow-x: auto; width: 100%; -ms-overflow-style: -ms-autohiding-scrollbar;}
@@ -160,6 +163,7 @@
 	.etime,.etimer  { display: inline-block; padding-left: 5px; font-weight: 200; line-height: 1,4; font-size: 12px; }
 	.event { display: inline-block; border:solid; border-width: 0px 0px 0px 1px; padding: 0px 0px 0px 0px!important; margin:0px 0px 0px -3px!important;}
 	.event .ename,.event .etime,.event .etimer { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.event .ename,.event .etime,.event .etimer { position: relative; z-index: 6; }
 	.channel-listing { list-style-type: none;}
 	.curevent { background: #e9e9e9; }
 	.etimesmall, .etime, .ename {
@@ -232,7 +236,10 @@
 
 #if $mode == 1
 #set $renderEventBlock = $renderEvtBlock()
-<div id="fulltbl" class="responsive-table" style="overflow:auto">
+<div id="fulltbl" class="responsive-table epg__tv-guide" style="overflow:auto">
+#if $day == 0 and $week == 0
+	<div class="epg__tv-guide-now"></div>
+#end if
 	<table border="0" cellpadding="0" cellspacing="0" width="100%" id="tbl1" class="table table-striped">
 		<thead>
 			<tr id="tbl2body" style="background-color:#bababa;">
@@ -389,6 +396,35 @@ function fixTableHeight() {
 fixTableHeight();
 
 jQuery(window).resize(function(){ fixTableHeight(); });
+
+#if $mode == 1 and $day == 0 and $week == 0
+(function() {
+	var marker = jQuery('.epg__tv-guide-now');
+	function updateTvGuideNowMarker() {
+		var rows = jQuery('#tbl1body tr');
+		var elapsed = Date.now() / 1000 - $slot_start;
+		var slotIndex = Math.floor(elapsed / 7200);
+		if (slotIndex < 0 || slotIndex >= rows.length) {
+			marker.hide();
+			return;
+		}
+		var container = jQuery('#fulltbl');
+		var row = rows.eq(slotIndex);
+		var top = row.offset().top - container.offset().top + container.scrollTop() + row.outerHeight() * ((elapsed % 7200) / 7200);
+		marker.css({top: top + 'px', width: jQuery('#tbl1').outerWidth() + 'px'}).show();
+	}
+	updateTvGuideNowMarker();
+	var interval = setInterval(function() {
+		if (!jQuery.contains(document, marker[0])) {
+			clearInterval(interval);
+			jQuery(window).off('resize.epgTvGuideNow', updateTvGuideNowMarker);
+			return;
+		}
+		updateTvGuideNowMarker();
+	}, 10000);
+	jQuery(window).on('resize.epgTvGuideNow', updateTvGuideNowMarker);
+})();
+#end if
 
 jQuery(".bq").click(function() {
 	var id = jQuery(this).data("ref");
