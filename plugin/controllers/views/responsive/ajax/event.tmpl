@@ -12,6 +12,9 @@
 #set $sRefQuoteEscaped = $sref.replace("'", "\\'")
 #set $endTime = $int($event.begin + $event.duration)
 #set $metadata = $dumps({ 'sref': quote($event.sref), 'id': $event.id, 'begin': $event.begin, 'end': $int($event.begin + $event.duration) }, indent=None, separators=(",", ":"))
+#set $atName = quote($event.title, safe='')
+#set $atSref = quote($event.sref, safe='')
+#set $atSname = quote($event.channel, safe='')
 
 #set $piconCssClass = ''
 #if $showPiconBackground
@@ -138,7 +141,7 @@
 		</button>
 
 #if $at
-		<button onclick='location.href="#/at/new?name=$title&match=$title&timespanFrom=$event.begin_str&timespanTo=$event.end&sref=$sref";' class="link--not-skinned" title="$tstrings['add_autotimer']" data-dismiss="modal">
+		<button type="button" data-href="/#/at/new?name=$atName&amp;match=$atName&amp;timespanFrom=$event.begin_str&amp;timespanTo=$event.end&amp;sref=$atSref&amp;sname=$atSname" onclick="window.location.href=this.dataset.href" class="link--not-skinned" title="$tstrings['add_autotimer']" data-dismiss="modal">
 			<i class="material-icons material-icons-centered">av_timer</i>
 		</button>
 #end if

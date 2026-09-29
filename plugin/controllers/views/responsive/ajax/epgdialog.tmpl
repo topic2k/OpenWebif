@@ -30,6 +30,9 @@
 		#set $channel = $event.sname.replace("'", r"\'")
 		#set $title = $event.title.replace("'", r"\'")
 		#set $sref=quote($event.sref, safe=' ~@#$()*!+=:;,.?/\'')
+		#set $atName = quote($event.title, safe='')
+		#set $atSref = quote($event.sref, safe='')
+		#set $atSname = quote($event.sname, safe='')
 
 #if $isSettingEnabled('minepglist') == 'checked'
 
@@ -57,7 +60,7 @@
 						<a href="javascript:void(0);" class="link--skinned" data-dismiss="modal" data-toggle="modal" data-target="#TimerModal" data-evid="$event.id" data-ref="$sref" title="$tstrings['edit_timer']"><i class="material-icons material-icons-centered">alarm</i></a>
 						<a href="javascript:void(0);" class="link--skinned" onclick="addTimerEvent('$sref',$event.id,true);return false;" title="$tstrings['add_zaptimer']"><i class="material-icons material-icons-centered">rotate_90_degrees_ccw</i></a>
 					#if $at
-						<a href="javascript:void(0);" data-dismiss="modal" onclick='location.href="#/at/new?name=$title&match=$title&timespanFrom=$event.begin&timespanTo=$event.end&sref=$sref";' class="link--skinned" title="$tstrings['add_autotimer']">
+						<a href="/#/at/new?name=$atName&amp;match=$atName&amp;timespanFrom=$event.begin&amp;timespanTo=$event.end&amp;sref=$atSref&amp;sname=$atSname" onclick="window.location.href=this.href" data-dismiss="modal" class="link--skinned" title="$tstrings['add_autotimer']">
 							<i class="material-icons material-icons-centered">av_timer</i>
 						</a>
 					#end if
@@ -104,7 +107,7 @@
 								<a href="javascript:void(0);" class="link--skinned" data-dismiss="modal" data-toggle="modal" data-target="#TimerModal" data-evid="$event.id" data-ref="$sref" title="$tstrings['edit_timer']"><i class="material-icons material-icons-centered">alarm</i></a>
 								<a href="javascript:void(0);" class="link--skinned" onclick="addTimerEvent('$sref',$event.id,true);return false;" title="$tstrings['add_zaptimer']"><i class="material-icons material-icons-centered">rotate_90_degrees_ccw</i></a>
 							#if $at
-								<a href="javascript:void(0);" data-dismiss="modal" onclick='location.href="#/at/new?name=$title&match=$title&timespanFrom=$event.begin&timespanTo=$event.end&sref=$sref";' class="link--skinned" title="$tstrings['add_autotimer']">
+								<a href="/#/at/new?name=$atName&amp;match=$atName&amp;timespanFrom=$event.begin&amp;timespanTo=$event.end&amp;sref=$atSref&amp;sname=$atSname" onclick="window.location.href=this.href" data-dismiss="modal" class="link--skinned" title="$tstrings['add_autotimer']">
 								<i class="material-icons material-icons-centered">av_timer</i>
 								</a>
 							#end if

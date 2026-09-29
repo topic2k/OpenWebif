@@ -114,18 +114,26 @@
       } else {
         switch (field.type) {
           case 'checkbox':
-            value = value === true || value === 'True' || value.toString() === field.value;
+            value = value === true || value === 'True' || value === 1 || value.toString() === field.value;
             field.checked = value;
             break;
           case 'select-multiple':
             try {
-              const valuesOnly = value.map((entry) => entry['sRef']);
-              self.autoTimerChoices[name]
-                .setChoices(value, 'sRef', 'name', false)
-                .setChoices(value, 'label', 'value', false)
-                .removeActiveItems()
-                .setChoiceByValue(value)
-                .setChoiceByValue(valuesOnly);
+              if (name === 'tag') {
+                const newTags = value.filter((tag) => !self.allTags.some((choice) => choice.value === tag));
+                self.autoTimerChoices[name]
+                  .setChoices(newTags.map((tag) => ({ value: tag, label: tag })), 'value', 'label', false)
+                  .removeActiveItems()
+                  .setChoiceByValue(value);
+              } else {
+                const valuesOnly = value.map((entry) => entry['sRef']);
+                self.autoTimerChoices[name]
+                  .setChoices(value, 'sRef', 'name', false)
+                  .setChoices(value, 'label', 'value', false)
+                  .removeActiveItems()
+                  .setChoiceByValue(value)
+                  .setChoiceByValue(valuesOnly);
+              }
             } catch (ex) {
               owif.utils.debugLog(name, value, ex);
             }
@@ -578,7 +586,7 @@
 
           newItem.appendChild(document.createTextNode(loc));
           newItem.value = loc;
-          document.querySelector('select[name="location"] optgroup[name="more"').appendChild(newItem);
+          document.querySelector('select[name="location"] optgroup[name="more"]').appendChild(newItem);
           jQuery('select[name=location]').selectpicker('refresh');
         }
 
@@ -999,14 +1007,22 @@
         self.autoTimerChoices = owif.gui.preparedChoices();
 
         const hash = window.location.hash;
-        if (hash.startsWith('/#/at/new')) {
+        if (hash.split('?')[0] === '#/at/new') {
           const searchParams = new URLSearchParams(hash.split('?')[1] || '');
           const data = Object.fromEntries(searchParams);
           data['timespanFrom'] && (data['timespanFrom'] = getAdjustedTimeString(data['timespanFrom'], { hours: -1 }));
           data['timespanTo'] && (data['timespanTo'] = getAdjustedTimeString(data['timespanTo'], { hours: 1 }));
-          data['sref'] && (data['e2service'] = { e2servicereference: data['sref'] });
+          if (data['sref']) {
+            data['e2service'] = { e2servicereference: data['sref'], e2servicename: decodeHtml(data['sname']) };
+            data['searchType'] = 'exact';
+            data['searchCase'] = 'sensitive';
+            data['e2tag'] = 'Autotimer';
+          }
+          delete data['sref'];
+          delete data['sname'];
+          data['enabled'] = 'yes';
           self.populateForm(data);
-        } else if (hash.startsWith('/#/at/edit')) {
+        } else if (hash.split('?')[0] === '#/at/edit') {
           const searchParams = new URLSearchParams(hash.split('?')[1] || '');
           self.editEntry(searchParams.get('id'));
         } else {
