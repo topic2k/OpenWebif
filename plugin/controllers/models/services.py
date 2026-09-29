@@ -1210,6 +1210,8 @@ def getMultiEpg(self, ref, begintime=-1, endtime=None, mode=1, modern=False):
 					)
 					if covers_event or (modern and short_zap):
 						timer = getTimerDetails(first)
+						if modern:
+							timer.update({'sref': str(first.service_ref), 'begin': first.begin, 'end': first.end})
 						timerlist[sref] = timerlist[sref][i:]
 						break
 

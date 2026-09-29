@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from html import escape
+from json import dumps
 from time import localtime, strftime
 from urllib.parse import quote
 # from Plugins.Extensions.OpenWebif.controllers.i18n import tstrings
@@ -8,21 +10,25 @@ from urllib.parse import quote
 class renderEvtBlock:
 	def __init__(self):
 		self.template = """
-		<article onclick="loadeventepg('%s', '%s'); return false;" class="epg__event event %s" data-ref="%s" data-id="%s" data-begin="%s" data-end="%s" data-toggle="modal" data-target="#EventModal">
+		<article onclick="if (event.target.closest('.epg__timer-marker')) return; loadeventepg('%s', '%s'); return false;" class="epg__event event %s" data-ref="%s" data-id="%s" data-begin="%s" data-end="%s" data-toggle="modal" data-target="#EventModal">
 			<time class="epg__time--start">%s</time>
 			<span class="epg__title title">
 				%s
 			</span>
 			%s
+			%s
 		</article>
 		"""
 
-	def render(self, event):
+	def render(self, event, edit_timer_title='Edit Timer'):
 		eventcssclass = ''
+		timermarker = ''
 
 		timer = event['timer']
 		if timer:
 			eventcssclass = eventcssclass + ' event--has-timer timer--' + timer['markerType']
+			metadata = escape(dumps({'sref': quote(timer['sref']), 'begin': timer['begin'], 'end': timer['end']}, separators=(',', ':')), quote=True)
+			timermarker = '<button type="button" class="epg__timer-marker" data-metadata="%s" data-toggle="modal" data-target="#TimerModal" onclick="event.stopPropagation(); jQuery(\'#TimerModal\').modal(\'show\', this); return false;" title="%s" aria-label="%s"></button>' % (metadata, escape(edit_timer_title, quote=True), escape(edit_timer_title, quote=True))
 			if timer['isEnabled']:
 				timereventsymbol = '<i class="material-icons material-icons-centered">alarm_on</i>'
 			else:
@@ -54,5 +60,6 @@ class renderEvtBlock:
 			endts,
 			strftime("%H:%M", localtime(event['begin_timestamp'])),
 			event['title'],
-			shortdesc
+			shortdesc,
+			timermarker
 		)

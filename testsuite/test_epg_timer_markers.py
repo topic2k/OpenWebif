@@ -1,9 +1,12 @@
 import ast
 import importlib.util
+import json
 from collections import OrderedDict
+from html import unescape
 from pathlib import Path
 from time import localtime, mktime
 from types import SimpleNamespace
+from urllib.parse import unquote
 import unittest
 
 
@@ -166,6 +169,7 @@ class EpgTimerMarkerTests(unittest.TestCase):
                 for key, value in attributes.items():
                     setattr(timer, key, value)
                 details = self.get_timer_details(timer)
+                details.update({'sref': '1:0:1:', 'begin': 1000, 'end': 4600})
                 self.assertEqual(details['markerType'], expected)
                 self.assertIn('event--has-timer timer--' + expected, self.renderer.render(self.event(details)))
                 self.assertIn("$event['timer']['markerType']", self.template)
@@ -178,6 +182,51 @@ class EpgTimerMarkerTests(unittest.TestCase):
     def test_events_without_timers_have_no_marker(self):
         self.assertNotIn('event--has-timer', self.renderer.render(self.event(None)))
         self.assertIn("#if $event['timer']", self.template)
+
+    def test_marker_identifies_matching_timer_not_event_in_both_views(self):
+        start = int(mktime((2026, 9, 28, 0, 0, 0, -1, -1, -1)))
+        timer = SimpleNamespace(service_ref='1:0:1:', begin=start + 3300,
+                                end=start + 3301, eit=11, disabled=0, justplay=1)
+        for mode in (1, 2):
+            with self.subTest(mode=mode):
+                events = self.epg_events([timer], mode)
+                self.assertEqual(events[1]['timer']['sref'], '1:0:1:')
+                self.assertEqual(events[1]['timer']['begin'], timer.begin)
+                self.assertEqual(events[1]['timer']['end'], timer.end)
+                self.assertNotEqual(events[1]['begin_timestamp'], timer.begin)
+        recording = SimpleNamespace(service_ref='1:0:1:', begin=start + 3600,
+                                    end=start + 7200, disabled=0, justplay=0)
+        classic = self.epg_events([recording], 1, modern=False)
+        self.assertIsNotNone(classic[1]['timer'])
+        self.assertNotIn('begin', classic[1]['timer'])
+
+    def test_timer_marker_opens_edit_modal_without_opening_event(self):
+        details = {'markerType': 'zap', 'isEnabled': 1, 'isAutoTimer': 0,
+                   'sref': '1:0:1:', 'begin': 1005, 'end': 1006}
+        markup = self.renderer.render(self.event(details))
+        self.assertIn('class="epg__timer-marker"', markup)
+        self.assertIn('data-target="#TimerModal"', markup)
+        self.assertIn('&quot;begin&quot;:1005', markup)
+        self.assertIn('&quot;end&quot;:1006', markup)
+        self.assertIn('epg__timer-marker', self.template)
+        self.assertIn('data-target="#TimerModal"', self.template)
+        self.assertIn("$event['timer']['begin']", self.template)
+        self.assertIn("$event['timer']['end']", self.template)
+        self.assertIn("closest('.epg__timer-marker')", markup)
+        self.assertIn("closest('.epg__timer-marker')", self.template)
+        self.assertIn("event.stopPropagation(); jQuery('#TimerModal').modal('show', this)", markup)
+        self.assertIn("event.stopPropagation(); jQuery('#TimerModal').modal('show', this)", self.template)
+        self.assertNotIn('class="epg__timer-marker"', self.renderer.render(self.event(None)))
+
+    def test_marker_metadata_encodes_service_reference_for_timer_dialog(self):
+        details = {'markerType': 'record', 'isEnabled': 1, 'isAutoTimer': 0,
+                   'sref': '1:0:1:http%3a//box.example/a?x=1&y=2', 'begin': 1005, 'end': 5000}
+        markup = self.renderer.render(self.event(details))
+        metadata = markup.split('data-metadata="', 1)[1].split('"', 1)[0]
+        identity = json.loads(unescape(metadata))
+        self.assertEqual(unquote(identity['sref']), details['sref'])
+        self.assertEqual((identity['begin'], identity['end']), (1005, 5000))
+        self.assertNotIn('id', identity)
 
     def test_marker_colors_are_shared_between_views(self):
         self.assertIn('.epg__event.event--has-timer::after', self.template)

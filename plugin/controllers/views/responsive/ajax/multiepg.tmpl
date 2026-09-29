@@ -1,6 +1,7 @@
 #from urllib.parse import quote
 #from Plugins.Extensions.OpenWebif.controllers.i18n import tstrings
 #from json import dumps
+#from html import escape
 #from time import localtime, strftime, mktime
 #from Plugins.Extensions.OpenWebif.controllers.views.responsive.ajax.renderevtblock import renderEvtBlock
 
@@ -76,6 +77,21 @@
 	background: var(--epg-timer-marker);
 	pointer-events: none;
   	}
+	.event--has-timer .epg__timer-marker {
+		position: absolute;
+		top: -25%;
+		bottom: -10%;
+		left: -10px;
+		width: 12px;
+		z-index: 8;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		cursor: alias;
+	}
+	.event--has-timer .epg__timer-marker:focus-visible {
+		outline: 2px solid var(--skin-color, #0fb8fb);
+	}
 	.epg__timer-status .material-icons {
 		font-size: 1.2em;
     margin-right: 0.6ex;
@@ -163,6 +179,7 @@
 	.eventlist { display: inline-block; list-style-type: none; margin: 0px; padding: 0px 0px; width: 30000px; }
 	.event { display: block; position: relative; vertical-align: top; clear: left; border: none; }
 	.event.event--has-timer::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--epg-timer-marker); z-index: 7; pointer-events: none; }
+	.event.event--has-timer .epg__timer-marker { top: 0; bottom: 0; left: 0; }
 	.event a,.event > span { padding: 0px; height:58px; width:100%; display: block; white-space: normal; overflow: hidden; }
 	.event a:link:hover { text-decoration: none; }
 	.ename { display: block; width: 100%; padding-left:5px; padding-top:10px; float: left; font-weight: 200; line-height: 1,4; font-size: 14px; }
@@ -265,7 +282,7 @@
 	#for $sname, $eventlist in $events.items()
 				<td class="border" style="white-space:normal;">
 		#for $event in $eventlist[$slot]
-			$renderEventBlock.render($event)
+			$renderEventBlock.render($event, $tstrings['edit_timer'])
 		#end for
 		#if len($eventlist[$slot]) == 0
 					<article class="epg__event event"></article>
@@ -326,7 +343,7 @@
 	#if $event['timer']
 		#set $timerClass = ' event--has-timer timer--' + $event['timer']['markerType']
 	#end if
-					<li class="event$timerClass" data-ref="$ref" data-id="${event.id}" data-toggle="modal" data-target="#EventModal" onclick="loadeventepg('${event.id}', '$ref');return false;" style="width:${dur/6}px;padding:10px;">
+					<li class="event$timerClass" data-ref="$ref" data-id="${event.id}" data-toggle="modal" data-target="#EventModal" onclick="if (event.target.closest('.epg__timer-marker')) return; loadeventepg('${event.id}', '$ref');return false;" style="width:${dur/6}px;padding:10px;">
 						<a href="javascript:void(0);" class="ui-widget-content ${iscurr}" title="$event['title']">
 							<span class="ename">$event['title']<span class="etimesmall"> ($strftime("%d.%m", $localtime($event['begin_timestamp'])))</span></span>
 							<span class="etime">$strftime("%H:%M", $localtime($event['begin_timestamp'])) - $strftime("%H:%M", $localtime($event['begin_timestamp'] + $event['duration']))</span>
@@ -334,6 +351,10 @@
 							<span class="etimer $event['timerStatus']">$tstrings['timer']</span>
 #end if
 						</a>
+#if $event['timer']
+	#set $timerMetadata = $escape($dumps({'sref': $quote($event['timer']['sref']), 'begin': $event['timer']['begin'], 'end': $event['timer']['end']}, separators=(',', ':')), quote=True)
+						<button type="button" class="epg__timer-marker" data-metadata="$timerMetadata" data-toggle="modal" data-target="#TimerModal" onclick="event.stopPropagation(); jQuery('#TimerModal').modal('show', this); return false;" title="$tstrings['edit_timer']" aria-label="$tstrings['edit_timer']"></button>
+#end if
 					</li>
 	#set $c = $c + 1
 #end for
