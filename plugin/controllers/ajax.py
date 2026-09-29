@@ -105,7 +105,8 @@ class AjaxController(BaseController):
 
 	# http://enigma2/ajax/event?idev=479&sref=1%3A0%3A19%3A1B1F%3A802%3A2%3A11A0000%3A0%3A0%3A0%3A
 	def P_event(self, request):
-		event = getEvent(getUrlArg(request, "sref"), getUrlArg(request, "idev"))
+		modern = getViewsPath('ajax/event.tmpl').startswith(f'{VIEWS_PATH}/responsive/')
+		event = getEvent(getUrlArg(request, "sref"), getUrlArg(request, "idev"), modern=modern)
 		if event:
 			event['event']['recording_margin_before'] = config.recording.margin_before.value
 			event['event']['recording_margin_after'] = config.recording.margin_after.value

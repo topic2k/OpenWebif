@@ -775,7 +775,7 @@ def getEventDesc(ref, idev, encode=True):
 	return {"description": description}
 
 
-def getTimerEventStatus(starttime, endtime, sref, timers=None):
+def getTimerEventStatus(starttime, endtime, sref, timers=None, eventid=None, modern=False):
 	# Check if an epgEvent has an associated timer. Unfortunately
 	# we cannot simply check against timer.eit, because a timer
 	# does not necessarily have one belonging to an epg event id.
@@ -785,6 +785,8 @@ def getTimerEventStatus(starttime, endtime, sref, timers=None):
 	timerlist = {}
 	if not timers:
 		timers = NavigationInstance.instance.RecordTimer.timer_list
+		if modern:
+			timers = timers + NavigationInstance.instance.RecordTimer.processed_timers
 	for timer in timers:
 		if str(timer.service_ref) not in timerlist:
 			timerlist[str(timer.service_ref)] = []
@@ -792,7 +794,13 @@ def getTimerEventStatus(starttime, endtime, sref, timers=None):
 	if sref in timerlist:
 		for timer in timerlist[sref]:
 			timerdetails = {}
-			if timer.begin <= starttime and timer.end >= endtime:
+			event_begin = getattr(timer, 'eventBegin', None)
+			short_zap = modern and timer.justplay and (
+				event_begin == starttime or
+				(getattr(timer, 'eit', None) and timer.eit == eventid) or
+				(not getattr(timer, 'eit', None) and event_begin is None and starttime <= timer.begin < endtime + 120)
+			)
+			if (timer.begin <= starttime and timer.end >= endtime) or short_zap:
 				if timer.disabled:
 					timerdetails = {
 						'isEnabled': 0,
@@ -808,12 +816,14 @@ def getTimerEventStatus(starttime, endtime, sref, timers=None):
 					timerdetails['isAutoTimer'] = timer.isAutoTimer
 				except AttributeError:
 					timerdetails['isAutoTimer'] = 0
+				if modern:
+					timerdetails.update({'sref': str(timer.service_ref), 'begin': timer.begin, 'end': timer.end})
 				return timerdetails
 
 	return None
 
 
-def getEvent(sref, eventid, encode=True):
+def getEvent(sref, eventid, encode=True, modern=False):
 	eventlookuptable = 'IBDTSENRWX'
 	epg = EPG()
 	event = epg.getEvent(sref, eventid, eventlookuptable)
@@ -831,7 +841,7 @@ def getEvent(sref, eventid, encode=True):
 		info['sref'] = event[7]
 		info['genre'], info['genreid'] = convertGenre(event[8])
 		info['picon'] = getPicon(event[7])
-		info['timer'] = getTimerEventStatus(event[1], event[1] + event[2], eventlookuptable, None)
+		info['timer'] = getTimerEventStatus(event[1], event[1] + event[2], event[7] if modern else eventlookuptable, None, event[0], modern)
 		info['link'] = getIPTVLink(event[7]).replace("%253a", ":")
 	return {'event': info}
 

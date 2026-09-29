@@ -1261,7 +1261,7 @@ function showErrorMain(txt,st)
 	
 }
 
-function deleteTimer(sRef, begin, end, title) {
+function deleteTimer(sRef, begin, end, title, callback) {
 	let t = decodeURIComponent(title);
 	swal({
 		title: tstr_del_timer,
@@ -1274,8 +1274,15 @@ function deleteTimer(sRef, begin, end, title) {
 		animation: "none"
 	}, function (isConfirm) {
 		if (isConfirm) {
-			webapi_execute("/api/timerdelete?sRef=" + sRef + "&begin=" + begin + "&end=" + end, 
-			function() { $('#'+begin+'-'+end).remove(); });
+			webapi_execute_result("/api/timerdelete?sRef=" + sRef + "&begin=" + begin + "&end=" + end,
+			function(state, txt) {
+				if (state) {
+					$('#'+begin+'-'+end).remove();
+					if (typeof callback === 'function') callback();
+				} else {
+					showErrorMain(txt);
+				}
+			});
 		}
 	});
 }
