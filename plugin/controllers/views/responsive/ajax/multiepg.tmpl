@@ -259,7 +259,7 @@
 
 #if $mode == 1
 #set $renderEventBlock = $renderEvtBlock()
-<div id="fulltbl" class="responsive-table epg__tv-guide" style="overflow:auto">
+<div id="fulltbl" class="responsive-table epg__tv-guide" style="overflow:auto" data-refresh-url="ajax/multiepg?bref=$quote($bref)&amp;day=$day&amp;epgmode=$epgmode&amp;week=$week">
 #if $day == 0 and $week == 0
 	<div class="epg__tv-guide-now"></div>
 #end if
@@ -296,7 +296,7 @@
 </div>
 
 #else
-<div id="fulltbl" class="responsive-table" style="overflow: auto; width: 100%;">
+<div id="fulltbl" class="responsive-table" style="overflow: auto; width: 100%;" data-refresh-url="ajax/multiepg?bref=$quote($bref)&amp;day=$day&amp;epgmode=$epgmode&amp;week=$week">
 	<div id="tblinner" style="position: relative; width: 30140px; min-width: 30140px;">
 		<div class="timetable">
 			<div class="timetable-now"></div>

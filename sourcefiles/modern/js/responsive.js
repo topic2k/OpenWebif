@@ -548,6 +548,11 @@ function addTimerEvent(sRef, eventId, justplay, callback) {
 
 	webapi_execute_result(url,
 		function(state,txt,conflicts) {
+			if (state) {
+				refreshEpgTimers();
+				if ($('#EventModal').hasClass('in'))
+					loadeventepg(eventId, sRef);
+			}
 			if (!state && conflicts) {
 				TimerConflict(conflicts,sRef,eventId,justplay);
 			} else if (typeof callback !== 'undefined') {
@@ -563,6 +568,25 @@ function addTimerEvent(sRef, eventId, justplay, callback) {
 			}
 		}
 	);
+}
+
+function refreshEpgTimers() {
+	let epg = $('#fulltbl');
+	let url = epg.data('refreshUrl');
+	if (!url) return;
+
+	$.get(url, function(html) {
+		if (!epg.closest('body').length) return;
+		let refreshed = $('<div>').append($.parseHTML(html));
+		let updated = new Map();
+		refreshed.find('#fulltbl .event[data-id][data-ref]').each(function() {
+			updated.set(this.getAttribute('data-ref') + '|' + this.getAttribute('data-id'), this);
+		});
+		epg.find('.event[data-id][data-ref]').each(function() {
+			let replacement = updated.get(this.getAttribute('data-ref') + '|' + this.getAttribute('data-id'));
+			if (replacement) $(this).replaceWith($(replacement).clone());
+		});
+	});
 }
 
 function addTimer(evt,chsref,chname,top) {
@@ -1067,6 +1091,7 @@ function btn_saveTimer() {
 				}
 				
 				if (canclose) {
+					refreshEpgTimers();
 					if (reloadTimers) {
 							if ( lastcontenturl.startsWith('ajax/timers') ) {
 								lastcontenturl = '';
