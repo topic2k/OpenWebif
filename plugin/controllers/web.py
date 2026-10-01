@@ -28,7 +28,7 @@ from .models.info import getInfo, getCurrentTime, getStatusInfo, getFrontendStat
 from .models.services import getCurrentService, getBouquets, getServices, getSubServices, getSatellites, getBouquetEpg, getBouquetNowNextEpg, getMultiChannelNowNextEpg, getSearchEpg, getSimilarEpg, getChannelEpg, getNowNextEpg, getAllServices, getPlayableServices, getPlayableService, getParentalControlList, getEvent, getServiceRef, getPicon, getAllServicesRaw, getEpgCalendarDays
 from .models.volume import getVolumeStatus, setVolumeUp, setVolumeDown, setVolumeMute, setVolume
 from .models.audiotrack import getAudioTracks, setAudioTrack
-from .models.control import zapService, remoteControl, setPowerState, getStandbyState
+from .models.control import zapService, remoteControl, setPowerState, getPowerStateRisks, getStandbyState
 from .models.locations import getLocations, getCurrentLocation, addLocation, removeLocation
 from .models.timers import getTimers, addTimer, addTimerByEventId, editTimer, removeTimer, toggleTimerStatus, cleanupTimer, writeTimerList, recordNow, tvbrowser, getSleepTimer, setSleepTimer, getPowerTimer, setPowerTimer, getVPSChannels
 from .models.message import sendMessage, getMessageAnswer
@@ -374,8 +374,11 @@ class WebController(BaseController):
 			self.P_set_powerup_without_waking_tv(request)
 		newstate = getUrlArg(request, "newstate")
 		if newstate:
-			return setPowerState(self.session, newstate)
+			return setPowerState(self.session, newstate, confirmed=getUrlArg(request, "confirmed") == "1")
 		return getStandbyState()
+
+	def P_powerstatecheck(self, request):
+		return getPowerStateRisks(self.session)
 
 	def P_supports_powerup_without_waking_tv(self, request):
 		"""

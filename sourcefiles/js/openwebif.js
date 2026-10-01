@@ -186,6 +186,11 @@ function initJsTranslation(strings) {
 	tstr_reboot_box = strings.reboot_box;
 	tstr_rec_status = strings.rec_status;
 	tstr_restart_gui = strings.restart_gui;
+	tstr_restart_recording_warning = strings.restart_recording_warning;
+	tstr_restart_upcoming_warning = strings.restart_upcoming_warning;
+	tstr_restart_streaming_warning = strings.restart_streaming_warning;
+	tstr_restart_anyway = strings.restart_anyway;
+	tstr_restart_check_failed = strings.restart_check_failed;
 	tstr_standby = strings.standby;
 	tstr_start_after_end = strings.start_after_end;
 	tstr_time = strings.time;
@@ -268,7 +273,7 @@ function wait_for_openwebif() {
 	}, 2000);
 }
 
-function handle_power_state_dialog(new_power_state) {
+function start_power_state(new_power_state, confirmed) {
 	let timeout = 0;
 	let sp = loadspinner.replace("'spinner'","'spinner1'");
 	$("#modaldialog").dialog('close');
@@ -282,8 +287,77 @@ function handle_power_state_dialog(new_power_state) {
 		timeout = 1000 ;
 	}
 	setTimeout(function () {
-		webapi_execute('api/powerstate?newstate=' + new_power_state);
+		webapi_execute('api/powerstate?newstate=' + new_power_state + (confirmed ? '&confirmed=1' : ''));
 	}, timeout);
+}
+
+function show_power_state_message(message, title, buttons) {
+	$("#modaldialog").dialog('close').text(message).css('white-space', 'pre-line').dialog({
+		modal: true,
+		title: title,
+		autoOpen: true,
+		width: 'auto',
+		buttons: buttons,
+		close: function() {
+			$(this).dialog('destroy').html('').css('white-space', '');
+		}
+	});
+}
+
+function show_restart_check_error(new_power_state) {
+	if ($('#PowerModal').length) {
+		swal('', tstr_restart_check_failed, 'error');
+	} else {
+		let buttons = {};
+		buttons[tstr_close] = function() { $(this).dialog('close'); };
+		show_power_state_message(tstr_restart_check_failed,
+			new_power_state === 2 ? tstr_reboot_box : tstr_restart_gui, buttons);
+	}
+}
+
+function confirm_power_state(new_power_state, warnings) {
+	let title = new_power_state === 2 ? tstr_reboot_box : tstr_restart_gui;
+	let message = warnings.join('\n') + '\n\n' + tstr_restart_anyway;
+	if ($('#PowerModal').length) {
+		swal({
+			title: title,
+			text: message,
+			type: 'warning',
+			showCancelButton: true,
+			confirmButtonText: title,
+			cancelButtonText: tstr_cancel,
+			animation: 'none'
+		}, function(accepted) {
+			if (accepted) start_power_state(new_power_state, true);
+		});
+	} else {
+		let buttons = {};
+		buttons[tstr_cancel] = function() { $(this).dialog('close'); };
+		buttons[title] = function() { start_power_state(new_power_state, true); };
+		show_power_state_message(message, title, buttons);
+	}
+}
+
+function handle_power_state_dialog(new_power_state) {
+	if (new_power_state !== 2 && new_power_state !== 3) {
+		start_power_state(new_power_state, false);
+		return;
+	}
+	$.ajax({url: '/api/powerstatecheck', cache: false, dataType: 'json'}).done(function(risks) {
+		if (!risks || typeof risks.recording !== 'boolean' ||
+				typeof risks.upcoming !== 'boolean' || typeof risks.streaming !== 'boolean') {
+			show_restart_check_error(new_power_state);
+			return;
+		}
+		let warnings = [];
+		if (risks.recording) warnings.push(tstr_restart_recording_warning);
+		if (risks.upcoming) warnings.push(tstr_restart_upcoming_warning);
+		if (risks.streaming) warnings.push(tstr_restart_streaming_warning);
+		if (warnings.length) confirm_power_state(new_power_state, warnings);
+		else start_power_state(new_power_state, false);
+	}).fail(function() {
+		show_restart_check_error(new_power_state);
+	});
 }
 
 function load_reboot_dialog(data,title){

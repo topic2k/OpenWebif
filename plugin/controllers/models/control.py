@@ -19,10 +19,12 @@
 ##########################################################################
 
 from os import access, F_OK
+from time import time
 from urllib.parse import unquote
 
 from Components.config import config
 from enigma import eServiceReference, eActionMap, eServiceCenter
+from .info import GetStreamInfo
 from .services import getProtection
 from ..defaults import DEFAULT_RCU, ROOTTV, ROOTRADIO, service_types_radio, service_types_tv
 from Screens.InfoBar import InfoBar, MoviePlayer
@@ -204,7 +206,16 @@ def remoteControl(key, rctype="", rcu=DEFAULT_RCU):
 	}
 
 
-def setPowerState(session, state):
+def getPowerStateRisks(session):
+	next_recording = session.nav.RecordTimer.getNextRecordingTime()
+	return {
+		"recording": bool(session.nav.getRecordings()),
+		"upcoming": next_recording > 0 and 0 <= next_recording - time() < 360,
+		"streaming": bool(GetStreamInfo())
+	}
+
+
+def setPowerState(session, state, confirmed=False):
 	from Screens.Standby import Standby, TryQuitMainloop, inStandby
 	state = int(state)
 	if state == 0:  # Toggle StandBy
@@ -215,9 +226,13 @@ def setPowerState(session, state):
 	elif state == 1:  # DeepStandBy
 		session.open(TryQuitMainloop, state)
 	elif state == 2:  # Reboot
-		session.open(TryQuitMainloop, state)
+		dialog = session.open(TryQuitMainloop, state)
+		if confirmed and getattr(dialog, "connected", False):
+			dialog.close(True)
 	elif state == 3:  # Restart Enigma
-		session.open(TryQuitMainloop, state)
+		dialog = session.open(TryQuitMainloop, state)
+		if confirmed and getattr(dialog, "connected", False):
+			dialog.close(True)
 	elif state == 4:  # Wakeup
 		if inStandby is not None:
 			inStandby.Power()

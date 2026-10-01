@@ -108,6 +108,18 @@ msgstr "Angepasstes Aufnahmeverzeichnis"
 msgid "A filename is required"
 msgstr "Bitte den Dateinamen angeben"
 
+#: ../plugin/controllers/i18n.py:213
+msgid "A recording is currently running."
+msgstr "Eine Aufnahme läuft gerade."
+
+#: ../plugin/controllers/i18n.py:214
+msgid "A recording will start within six minutes."
+msgstr "Eine Aufnahme beginnt innerhalb der nächsten sechs Minuten."
+
+#: ../plugin/controllers/i18n.py:215
+msgid "A stream is currently active."
+msgstr "Ein Stream ist gerade aktiv."
+
 #: ../plugin/controllers/i18n.py:528
 msgid "A value is required"
 msgstr "Sie müssen etwas schreiben!"
@@ -558,6 +570,10 @@ msgstr "Aufnahme kopieren"
 #, python-format
 msgid "Could not add timer '%s'!"
 msgstr "Timer '%s' konnte nicht zugefügt werden!"
+
+#: ../plugin/controllers/i18n.py:217
+msgid "Could not check recordings and streams. Restart cancelled."
+msgstr "Aufnahmen und Streams konnten nicht geprüft werden. Neustart abgebrochen."
 
 #: ../plugin/controllers/models/timers.py:555
 #, python-format
@@ -1772,6 +1788,10 @@ msgstr "Setze Zähler zurück"
 #: ../plugin/controllers/i18n.py:220
 msgid "Restart GUI"
 msgstr "GUI neustarten"
+
+#: ../plugin/controllers/i18n.py:216
+msgid "Restart anyway? Recordings and streams may be interrupted."
+msgstr "Trotzdem neustarten? Aufnahmen und Streams werden unterbrochen."
 
 #: ../plugin/controllers/i18n.py:142 ../plugin/controllers/i18n.py:370
 msgid "Restrict to bouquets"
