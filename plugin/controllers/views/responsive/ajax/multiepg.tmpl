@@ -3,6 +3,7 @@
 #from json import dumps
 #from html import escape
 #from time import localtime, strftime, mktime
+#from Plugins.Extensions.OpenWebif.controllers.views.responsive.ajax.epgdaterange import formatEpgDateRange, getEpgDateLabels
 #from Plugins.Extensions.OpenWebif.controllers.views.responsive.ajax.renderevtblock import renderEvtBlock
 
 <!-- TODO: move styles to css file -->
@@ -22,6 +23,8 @@
 	#bqwrap::after { content: '\276F'; position: absolute; right: 0; top: 0; bottom: 0; width: 36px; display: flex; align-items: center; justify-content: center; background: linear-gradient(to right, transparent, #fff 50%); pointer-events: none; font-weight: bold; font-size: 14px; }
 	#bqwrap.at-end::after { display: none; }
 	.theme--city-lights #bqwrap::after { background: linear-gradient(to right, transparent, #282c37 50%); }
+	#navepg > .nav-tabs { margin-bottom: 0; }
+	#epg-date-range { clear: both; font-size: 18px; line-height: 1.4; margin: 12px 4px; }
 	.plusclick { font-size: 14px; }
 	.navtab-active { cursor: pointer; margin-right:8px; font-weight: bold; border-bottom-width: 2px; border-bottom-style: solid; background-color: transparent !important; bottom: 2px;}
 	.navtab-inactive { cursor: pointer; margin-right:8px; border:None; background-color: transparent !important;  }
@@ -174,10 +177,12 @@
 
 <div id="compressmepg" onclick="CompressMEPG();"><i id="compressmepgi" class="fa fa-compress link" aria-hidden="true"></i></div>
 <div id="refreshmepg2" onclick="RefreshMEPG();"><i id="refreshmepgi" class="fa fa-refresh link" aria-hidden="true"></i></div>
-	<br clear="all">
 
+#if $slot_start
+<div id="epg-date-range">$formatEpgDateRange($slot_start, $tstrings)</div>
+#end if
 <div id="bqwrap">
-<ul id="bqlist" class="nav nav-tabs tab--skinned" style="margin-top: -10px;height:auto;">
+<ul id="bqlist" class="nav nav-tabs tab--skinned" style="height:auto;">
 #for $bq in $bouquets
 	<li><div class="bq navtab-#if $bq[0]==$bref then 'active' else 'inactive' #" data-ref="$quote($bq[0])">$bq[1]</div></li>
 #end for
@@ -287,7 +292,7 @@
 
 #if $mode == 1
 #set $renderEventBlock = $renderEvtBlock()
-<div id="fulltbl" class="responsive-table epg__tv-guide" style="overflow:auto" data-refresh-url="ajax/multiepg?bref=$quote($bref)&amp;day=$day&amp;epgmode=$epgmode&amp;week=$week">
+<div id="fulltbl" class="responsive-table epg__tv-guide" style="overflow:auto" data-slot-start="$slot_start" data-refresh-url="ajax/multiepg?bref=$quote($bref)&amp;day=$day&amp;epgmode=$epgmode&amp;week=$week">
 #if $day == 0 and $week == 0
 	<div class="epg__tv-guide-now"></div>
 #end if
@@ -324,7 +329,7 @@
 </div>
 
 #else
-<div id="fulltbl" class="responsive-table" style="overflow: auto; width: 100%;" data-refresh-url="ajax/multiepg?bref=$quote($bref)&amp;day=$day&amp;epgmode=$epgmode&amp;week=$week">
+<div id="fulltbl" class="responsive-table" style="overflow: auto; width: 100%;" data-slot-start="$slot_start" data-first="$first" data-refresh-url="ajax/multiepg?bref=$quote($bref)&amp;day=$day&amp;epgmode=$epgmode&amp;week=$week">
 	<div id="tblinner" style="position: relative; width: 30140px; min-width: 30140px;">
 		<div class="timetable">
 			<div class="timetable-now"></div>
@@ -371,7 +376,7 @@
 	#if $event['timer']
 		#set $timerClass = ' event--has-timer timer--' + $event['timer']['markerType']
 	#end if
-					<li class="event$timerClass" data-ref="$ref" data-id="${event.id}" data-toggle="modal" data-target="#EventModal" onclick="if (event.target.closest('.epg__timer-marker')) return; loadeventepg('${event.id}', '$ref');return false;" style="width:${dur/6}px;padding:10px;">
+					<li class="event$timerClass" data-ref="$ref" data-id="${event.id}" data-begin="${event.begin_timestamp}" data-end="$end" data-toggle="modal" data-target="#EventModal" onclick="if (event.target.closest('.epg__timer-marker')) return; loadeventepg('${event.id}', '$ref');return false;" style="width:${dur/6}px;padding:10px;">
 						<a href="javascript:void(0);" class="ui-widget-content ${iscurr}" title="$event['title']">
 							<span class="ename">$event['title']<span class="etimesmall"> ($strftime("%d.%m", $localtime($event['begin_timestamp'])))</span></span>
 							<span class="etime">$strftime("%H:%M", $localtime($event['begin_timestamp'])) - $strftime("%H:%M", $localtime($event['begin_timestamp'] + $event['duration']))</span>
@@ -424,6 +429,57 @@ jQuery(".timetable-now").css('height', '0');
 
 #end if
 var picons = $dumps($picons);
+var epgDateLabels = $dumps($getEpgDateLabels($tstrings));
+function updateEpgDateRange() {
+	var container = document.getElementById('fulltbl');
+	var label = document.getElementById('epg-date-range');
+	if (!container || !label) return;
+	var bounds = container.getBoundingClientRect();
+	var dates = {};
+	function addDate(timestamp) {
+		if (!isFinite(timestamp)) return;
+		var date = new Date(timestamp * 1000);
+		if (isNaN(date.getTime())) return;
+		var key = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+		dates[key] = date;
+	}
+	function visible(rect) {
+		return rect.bottom > bounds.top && rect.top < bounds.bottom && rect.right > bounds.left && rect.left < bounds.right;
+	}
+	if (container.classList.contains('epg__tv-guide')) {
+		var slotStart = Number(container.getAttribute('data-slot-start'));
+		container.querySelectorAll('#tbl1body tr').forEach(function(row, index) {
+			var rect = row.getBoundingClientRect();
+			if (!visible(rect)) return;
+			// Use the row's two-hour slot even when its channel has no EPG events.
+			var startFraction = Math.max(0, (bounds.top - rect.top) / (rect.bottom - rect.top));
+			var endFraction = Math.min(1, (bounds.bottom - rect.top) / (rect.bottom - rect.top));
+			addDate(slotStart + (index + startFraction) * 7200);
+			addDate(slotStart + (index + endFraction) * 7200 - 1);
+			row.querySelectorAll('.epg__event[data-begin]').forEach(function(event) {
+				if (visible(event.getBoundingClientRect())) addDate(Number(event.getAttribute('data-begin')));
+			});
+		});
+	} else {
+		var first = Number(container.getAttribute('data-first'));
+		var start = first + container.scrollLeft * 6;
+		var end = start + Math.max(0, container.clientWidth - 140) * 6 - 1;
+		addDate(start);
+		addDate(end);
+		container.querySelectorAll('.epg__timeline-row').forEach(function(row) {
+			if (!visible(row.getBoundingClientRect())) return;
+			row.querySelectorAll('.eventlist .event[data-begin]').forEach(function(event) {
+				var begin = Number(event.getAttribute('data-begin'));
+				if (begin < start && Number(event.getAttribute('data-end')) > start && visible(event.getBoundingClientRect())) addDate(begin);
+			});
+		});
+	}
+	var days = Object.keys(dates).map(function(key) { return dates[key]; }).sort(function(a, b) { return a - b; });
+	if (!days.length) days = [new Date(Number(container.getAttribute('data-slot-start')) * 1000)];
+	label.textContent = days.map(function(date) {
+		return epgDateLabels.weekdays[date.getDay()] + ', ' + date.getDate() + '.' + epgDateLabels.months[date.getMonth()] + ' ' + date.getFullYear();
+	}).join(' / ');
+}
 var reloadTimers = false;
 function getScrollBarWidth () {
 	var outer = jQuery('<div>').css({visibility: 'hidden', width: 100, overflow: 'scroll'}).appendTo('body'),
@@ -453,8 +509,10 @@ function fixTableHeight() {
 #end if
 }
 fixTableHeight();
+updateEpgDateRange();
+jQuery('#fulltbl').on('scroll', updateEpgDateRange);
 
-jQuery(window).resize(function(){ fixTableHeight(); });
+jQuery(window).resize(function(){ fixTableHeight(); updateEpgDateRange(); });
 
 #if $mode == 1 and $day == 0 and $week == 0
 (function() {
@@ -758,9 +816,10 @@ function autoJumpTimeline() {
 
 setTimeout(function() {
 	#if $mode == 1
-	autoJumpTvGuide();
+		autoJumpTvGuide();
 	#else
-	autoJumpTimeline();
+		autoJumpTimeline();
 	#end if
+	updateEpgDateRange();
 }, 100);
 </script>
