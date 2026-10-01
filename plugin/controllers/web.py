@@ -33,6 +33,7 @@ from .models.locations import getLocations, getCurrentLocation, addLocation, rem
 from .models.timers import getTimers, addTimer, addTimerByEventId, editTimer, removeTimer, toggleTimerStatus, cleanupTimer, writeTimerList, recordNow, tvbrowser, getSleepTimer, setSleepTimer, getPowerTimer, setPowerTimer, getVPSChannels
 from .models.message import sendMessage, getMessageAnswer
 from .models.movies import getMovieList, removeMovie, getMovieInfo, movieAction, getAllMovies, getMovieDetails, setMovieResumePoint, MOVIETAGFILE
+from .models.tagmanager import update_known_tags, rename_tag_and_uses, delete_tag_and_uses, get_tag_usage_for_session, format_tag
 from .models.config import cancelConfigBatch, getSettings, addCollapsedMenu, removeCollapsedMenu, saveConfig, saveConfigBatch, getConfigs, getConfigsSections
 from .models.stream import getStream, getTS, getStreamSubservices, GetSession
 from .models.servicelist import reloadServicesLists
@@ -1061,6 +1062,38 @@ class WebController(BaseController):
 			HTTP response with headers
 		"""
 		return getMovieInfo()
+
+	def P_tagmanager(self, request):
+		if request.method != b'POST':
+			return {'result': False, 'message': 'POST required'}
+		action = getUrlArg(request, 'action')
+		tag = getUrlArg(request, 'tag')
+		new_tag = getUrlArg(request, 'newtag')
+		update_uses = getUrlArg(request, 'updateuses')
+		if update_uses not in (None, '0', '1') or (update_uses == '1' and action not in ('rename', 'delete')):
+			return {'result': False, 'message': 'Invalid updateuses option'}
+		try:
+			if update_uses == '1' and action == 'rename':
+				changed = rename_tag_and_uses(tag, new_tag, self.session, comp_config.movielist.videodirs.value[:] or None)
+				tags = changed['tags']
+			elif update_uses == '1':
+				changed = delete_tag_and_uses(tag, self.session, comp_config.movielist.videodirs.value[:] or None)
+				tags = changed['tags']
+			else:
+				tags = update_known_tags(action, tag, new_tag)
+		except Exception as err:
+			return {'result': False, 'message': str(err)}
+		usage = None
+		if action != 'delete':
+			try:
+				changed_tag = format_tag(new_tag if action == 'rename' else tag)
+				usage = get_tag_usage_for_session([changed_tag], self.session, comp_config.movielist.videodirs.value[:] or None)[changed_tag]
+			except Exception as err:
+				print(f'[OpenWebif] Unable to determine tag usage: {err}')
+		response = {'result': True, 'tags': tags, 'usage': usage}
+		if update_uses == '1':
+			response['updated'] = changed['updated']
+		return response
 
 # VPS Plugin
 	def vpsparams(self, request):

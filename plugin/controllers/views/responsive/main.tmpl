@@ -110,7 +110,7 @@
 							<time datetime="" id="osd__current-event__time__end"></time>
 						</span>
 					</button>
-					<button id="osd__current-event__record" style="padding: 0 0.4ex;" onclick="owif.stb.instantRecord();" title="$tstrings['start_instant_record']">
+					<button id="osd__current-event__record" style="padding: 0 0.4ex;" onclick="startInstantRecord();" title="$tstrings['start_instant_record']">
 						<i class="icon material-icons" style="font-size: 2.4ex; vertical-align: bottom; color: rgba(255,255,255,0.4);">radio_button_checked</i>
 					</button>
 					<a href="/#/tv" id="osd__current-service">
@@ -359,6 +359,12 @@
 							<a href="#bqe" data-close="true" accesskey="b" title="Shortcut: b">
 								<i class="material-icons">view_list</i>
 								<span>$tstrings['Bouquet_Editor']</span>
+							</a>
+						</li>
+						<li>
+							<a href="#tagmanager" data-close="true">
+								<i class="material-icons">label</i>
+								<span>$tstrings['manage_tags']</span>
 							</a>
 						</li>
 						<li>
@@ -762,6 +768,7 @@
 			</div>
 		</div>
 	</div>
+	<div id="timer-tag-overlay"></div>
 </div>
 <div id="PowerModal" class="modal fade" role="dialog">
 	<div class="modal-dialog">
@@ -911,9 +918,13 @@
 </form>
 
 <script>
-	\$(document).ready(function() {
-		directlink();
-	});
+	function modernDirectlink() {
+		const hash = window.location.hash;
+		if (hash.replace('#/', '#') === '#tagmanager') load_maincontent('ajax/tagmanager');
+		else if (hash.startsWith('#/at/')) load_maincontent('ajax/at');
+		else directlink();
+	}
+
 	SetLSValue('TimerListOffset',0);
 </script>
 <script src="/modern/plugins/bootstrap/js/bootstrap.min.js"></script>
@@ -931,11 +942,12 @@
 ##   .filter((tag) => tag.tagName === 'script')
 ##   .join('')
 ## %>
-<script src="/modern/js/vendors-app.js?v=wp"></script><script src="/modern/js/owif-app.js?v=wp"></script>
+<script src="/modern/js/vendors-app.js?v=wp"></script><script src="/modern/js/owif-app.js?v1.2.36"></script>
 
 <script src="/modern/js/bootstrap-date-timepicker.min.js"></script>
 <script src="/modern/js/admin.min.js?v=wp"></script>
-<script src="/modern/js/responsive.min.js?v1.2.25"></script>
+<script src="/modern/plugins/choices/choices.min.js"></script>
+<script src="/modern/js/responsive.min.js?v1.2.36"></script>
 <script>initJsTranslationAddon($dumps($tstrings))</script>
 
 <script>
@@ -995,7 +1007,7 @@
 	}
 
 	\$(document).ready(function() {
-		directlink();
+		modernDirectlink();
 		
 		// Load MultiBoot slots when PowerModal opens
 		\$('#PowerModal').on('show.bs.modal', function (e) {

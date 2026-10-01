@@ -1008,7 +1008,7 @@ if ($) {
           $photo_caption.velocity({opacity: 1}, {duration: inDuration, queue: false, easing: 'easeOutQuad'});
         }
 
-        // Resize Image
+        // Resize tag-list
         var ratio = 0;
         var widthPercent = originalWidth / windowWidth;
         var heightPercent = originalHeight / windowHeight;
@@ -1114,7 +1114,7 @@ if ($) {
             }
           });
 
-          // Resize Image
+          // Resize tag-list
           origin.velocity(
             {
               width: originalWidth,
@@ -4171,7 +4171,7 @@ $(document).ready(function(){
 
 }( jQuery ));
 ;(function ($) {
-  // Image transition function
+  // tag-list transition function
   Materialize.fadeInImage =  function(selectorOrEl) {
     var element;
     if (typeof(selectorOrEl) === 'string') {

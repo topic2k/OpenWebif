@@ -56,6 +56,7 @@ function runAddTimer(mode, successful, modalOpen, withCallback = false, form = f
 		TimerConflict: (...args) => calls.conflicts.push(args),
 		tstr_timer_added: 'Timer added',
 		moment: () => ({unix: () => 12345}),
+		timerTagChoices: {getValue: () => ['Film']}, _tags: ['Film'],
 		current_serviceref: editing ? '1:0:1:' : '',
 		current_begin: 12300,
 		current_end: 12400,

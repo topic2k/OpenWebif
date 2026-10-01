@@ -32,6 +32,19 @@
 
 <!-- TODO: move styles to css file -->
 <style>
+#atbuttons {
+	width: max-content;
+	max-width: calc(100vw - 30px);
+}
+
+#atbuttons > li {
+	display: block;
+}
+
+#atbuttons > li > a {
+	white-space: normal;
+}
+
 .choices__inner .choices__input {
 	min-width: 1ch;
 	width: 1ch;
@@ -225,6 +238,14 @@
 					</h2>
 				</div>
 			</div>
+			<ul class="header-dropdown m-r-5">
+				<li>
+					<a href="javascript:void(0);" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false"><i class="material-icons">more_vert</i></a>
+					<ul class="dropdown-menu pull-right" id="atbuttons">
+						<li><a href="#tagmanager"><i class="material-icons material-icons-centered">label</i>$tstrings['manage_tags']</a></li>
+					</ul>
+				</li>
+			</ul>
 		</div>
 		<div class="body atbody">
 			<div id="content_main">
@@ -826,7 +847,6 @@
 
 <script src="/modern/plugins/xml2json/xml2json.min.js"></script>
 <script src="/modern/plugins/strftime/strftime.js"></script>
-<script src="/modern/plugins/choices/choices.min.js"></script>
 
 ## for future use (asset versioning)
 ## <!-- htmlWebpackPlugin renders the following js includes -->
@@ -836,6 +856,6 @@
 ##   .filter((tag) => tag.tagName === 'script')
 ##   .join('') 
 ## %>
-<script src="/modern/js/autotimers-app.js"></script>
+<script src="/modern/js/autotimers-app.js?v1.2.36"></script>
 
 #end filter

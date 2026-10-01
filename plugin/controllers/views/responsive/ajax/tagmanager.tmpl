@@ -1,0 +1,109 @@
+#filter WebSafe
+#from html import escape
+#from Plugins.Extensions.OpenWebif.controllers.i18n import tstrings
+
+<div class="col-xs-12" id="tagmanager" data-invalid="$tstrings['tag_invalid']" data-error="$tstrings['error']" data-usage-unknown="$tstrings['tag_usage_unknown']" data-not-used="$tstrings['tag_not_used']" data-label-timers="$tstrings['tag_timers']" data-label-recordings="$tstrings['tag_recordings']" data-label-autotimers="$tstrings['tag_autotimers']" data-edit-title="$tstrings['edit']" data-delete-title="$tstrings['delete']">
+	<div class="card">
+		<div class="header">
+			<h2><i class="material-icons material-icons-centered">label</i>$tstrings['manage_tags']</h2>
+		</div>
+		<div class="body">
+			<p>$tstrings['tag_usage_note']</p>
+			<div id="tagmanager-error" class="alert alert-danger" role="alert" style="display: none;"></div>
+			<form id="tagmanager-add" class="row clearfix">
+				<div class="col-xs-8 col-sm-5">
+					<label for="tagmanager-name">$tstrings['tag_name']</label>
+					<input id="tagmanager-name" type="text" maxlength="100" class="form-control" required>
+				</div>
+				<div class="col-xs-4 col-sm-3">
+					<label>&nbsp;</label>
+					<button type="submit" class="btn btn--skinned btn-block"><i class="material-icons material-icons-centered">add</i>$tstrings['add']</button>
+				</div>
+			</form>
+			<p class="help-block">$tstrings['tag_format_note']</p>
+			<h4>$tstrings['known_tags']</h4>
+			<div class="table-responsive">
+				<table class="table table-striped">
+					<thead><tr><th>$tstrings['tags']</th><th>$tstrings['tag_usage']</th><th></th></tr></thead>
+					<tbody>
+#for $tag in $tags
+#filter None
+						<tr data-tag="$escape($tag, quote=True)">
+#end filter
+							<td class="tagmanager-label" style="white-space: pre-wrap;">$tag.replace('_', ' ')</td>
+							<td class="tagmanager-usage">
+#if $usage is None
+								$tstrings['tag_usage_unknown']
+#else
+								#set $counts = $usage[$tag]
+#if $counts['timers'] == 0 and $counts['movies'] == 0 and $counts['autotimers'] == 0
+								$tstrings['tag_not_used']
+#else
+#if $counts['timers']
+								<div>$tstrings['tag_timers']: $counts['timers']</div>
+#end if
+#if $counts['movies']
+								<div>$tstrings['tag_recordings']: $counts['movies']</div>
+#end if
+#if $counts['autotimers']
+								<div>$tstrings['tag_autotimers']: $counts['autotimers']</div>
+#end if
+#end if
+#end if
+							</td>
+							<td class="text-right" style="white-space: nowrap;">
+								<button type="button" class="btn btn-default tagmanager-edit" title="$tstrings['edit']"><i class="material-icons">edit</i></button>
+								<button type="button" class="btn btn-default tagmanager-delete" title="$tstrings['delete']"><i class="material-icons">delete</i></button>
+							</td>
+						</tr>
+#end for
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+	<div id="tagmanager-rename" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="tagmanager-rename-title" data-backdrop="static" data-keyboard="false">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<form id="tagmanager-rename-form">
+					<div class="modal-header">
+						<h4 class="modal-title" id="tagmanager-rename-title">$tstrings['tag_rename_title']</h4>
+					</div>
+					<div class="modal-body">
+						<div id="tagmanager-rename-error" class="alert alert-danger" role="alert" style="display: none;"></div>
+						<label for="tagmanager-rename-name">$tstrings['tag_name']</label>
+						<input id="tagmanager-rename-name" type="text" maxlength="100" class="form-control" required>
+						<p class="help-block">$tstrings['tag_rename_note']</p>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-default" data-dismiss="modal">$tstrings['cancel']</button>
+						<button type="submit" class="btn btn-default">$tstrings['tag_rename_ok']</button>
+						<button type="button" class="btn btn--skinned" id="tagmanager-rename-update">$tstrings['tag_rename_update']</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+	<div id="tagmanager-delete-dialog" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="tagmanager-delete-title" data-backdrop="static" data-keyboard="false">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h4 class="modal-title" id="tagmanager-delete-title">$tstrings['tag_delete_title']</h4>
+				</div>
+				<div class="modal-body">
+					<div id="tagmanager-delete-error" class="alert alert-danger" role="alert" style="display: none;"></div>
+					<p id="tagmanager-delete-name" style="white-space: pre-wrap;"></p>
+					<p class="help-block">$tstrings['tag_delete_note']</p>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">$tstrings['cancel']</button>
+					<button type="button" class="btn btn-default" id="tagmanager-delete-confirm">$tstrings['tag_delete_ok']</button>
+					<button type="button" class="btn btn--skinned" id="tagmanager-delete-update">$tstrings['tag_delete_update']</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<script src="/modern/js/tagmanager.min.js?v=6"></script>
+<script>initTagManager();</script>
+#end filter

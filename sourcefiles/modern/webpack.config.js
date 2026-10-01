@@ -14,6 +14,7 @@ const legacyJsFiles = [
   path.resolve(__dirname, 'js', 'bootstrap-date-timepicker.js'),
   path.resolve(__dirname, 'js', 'admin.js'),
   path.resolve(__dirname, 'js', 'responsive.js'),
+  path.resolve(__dirname, 'js', 'tagmanager.js'),
 ];
 
 const config = {

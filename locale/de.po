@@ -2924,3 +2924,76 @@ msgstr "Beim Öffnen der EPG-Seite zur aktuellen Uhrzeit springen"
 #: ../plugin/controllers/i18n.py:625
 msgid "Jump to active channel in EPG"
 msgstr "Beim Öffnen zum aktiven Sender springen"
+
+#: ../plugin/controllers/i18n.py
+msgid "Manage tags"
+msgstr "Stichworte verwalten"
+
+#: ../plugin/controllers/i18n.py
+msgid "Known tags"
+msgstr "Bekannte Stichworte"
+
+#: ../plugin/controllers/i18n.py
+msgid "Usage"
+msgstr "Verwendung"
+
+#: ../plugin/controllers/i18n.py
+msgid "Not in use"
+msgstr "Nicht verwendet"
+
+#: ../plugin/controllers/i18n.py
+msgid "Usage could not be determined"
+msgstr "Verwendung konnte nicht ermittelt werden"
+
+#: ../plugin/controllers/i18n.py
+msgid "When renaming or deleting, choose whether to update existing assignments. Recordings are checked in configured movie directories."
+msgstr "Beim Umbenennen oder Löschen kann gewählt werden, ob bestehende Zuordnungen angepasst werden. Aufnahmen werden in den konfigurierten Filmverzeichnissen geprüft."
+
+#: ../plugin/controllers/i18n.py
+msgid "Tag name"
+msgstr "Stichwort"
+
+#: ../plugin/controllers/i18n.py
+msgid "Rename tag"
+msgstr "Stichwort umbenennen"
+
+#: ../plugin/controllers/i18n.py
+msgid "OK changes only the known tag; the other option also updates assignments in timers, recordings and AutoTimers."
+msgstr "OK ändert nur das bekannte Stichwort; die andere Option passt auch Zuordnungen in Timern, Aufnahmen und AutoTimern an."
+
+#: ../plugin/controllers/i18n.py
+msgid "OK"
+msgstr "OK"
+
+#: ../plugin/controllers/i18n.py
+msgid "Apply + update assignments"
+msgstr "Übernehmen + Verwendungen anpassen"
+
+#: ../plugin/controllers/i18n.py
+msgid "Delete tag"
+msgstr "Stichwort löschen"
+
+#: ../plugin/controllers/i18n.py
+msgid "Remove changes only the known tag; the other option also removes assignments from timers, recordings and AutoTimers."
+msgstr "Entfernen löscht nur das bekannte Stichwort; die andere Option entfernt auch Zuordnungen aus Timern, Aufnahmen und AutoTimern."
+
+#: ../plugin/controllers/i18n.py
+msgid "Remove"
+msgstr "Entfernen"
+
+#: ../plugin/controllers/i18n.py
+msgid "Remove + update assignments"
+msgstr "Entfernen + Verwendungen anpassen"
+
+#: ../plugin/controllers/i18n.py
+msgid "Enter a tag with 1 to 100 characters, without tabs, line breaks or control characters"
+msgstr "Ein Stichwort mit 1 bis 100 Zeichen ohne Tabulatoren, Zeilenumbrüche oder Steuerzeichen eingeben"
+
+#: ../plugin/controllers/i18n.py
+msgid "Spaces are stored as underscores. Underscores are displayed as spaces."
+msgstr "Leerzeichen werden als Unterstriche gespeichert. Unterstriche werden als Leerzeichen angezeigt."
+
+
+#: ../plugin/controllers/i18n.py
+msgid "Recordings"
+msgstr "Aufnahmen"

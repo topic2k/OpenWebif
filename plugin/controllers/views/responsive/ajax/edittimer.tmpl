@@ -2,6 +2,27 @@
 
 #set $dayNamesShort = [$tstrings['mo'], $tstrings['tu'], $tstrings['we'], $tstrings['th'], $tstrings['fr'], $tstrings['sa'], $tstrings['su']]
 
+<style>
+	#editTimerForm .choices__inner .choices__input { min-width: 1ch; width: 1ch; }
+	#TimerModal #timer-tag-overlay .choices__list--dropdown.is-active:not(.timer-tags-positioned) { visibility: hidden; }
+	#TimerModal #timer-tag-overlay .choices__list--dropdown {
+		position: fixed;
+		z-index: 1100;
+		bottom: auto;
+		margin-top: 0;
+		overflow: visible;
+	}
+	#TimerModal #timer-tag-overlay .choices__list--dropdown .choices__list {
+		overflow-x: hidden;
+		overflow-y: auto;
+	}
+	#editTimerForm .choices__list--multiple .choices__item.choices__item--selectable {
+		display: inline-flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+	}
+</style>
+
 <form>
 <div class="form-group">
 	<div class="row clearfix">
@@ -54,7 +75,7 @@
 		</div>
 		<div class="col-sm-9">
 			<div class="form-line">
-				<textarea rows="1" class="form-control no-resize auto-growth" name="description" id="description" placeholder="$tstrings['description']" />
+				<textarea rows="1" class="form-control no-resize auto-growth" name="description" id="description" placeholder="$tstrings['description']"></textarea>
 			</div>
 		</div>
 	</div>
@@ -145,15 +166,17 @@
 					<label for="vpsplugin_safemode">$tstrings['safe_mode']:</label>
 				</div>
 			</span>
-		</div
+		</div>
 	</span>
 
 	<div class="row clearfix">
 		<div class="col-sm-3">
-			<label>$tstrings['tags']:</label>
+			<label for="tagsnew">$tstrings['tags']:</label>
 		</div>
 		<div class="col-sm-9">
-			<span id="tagsnew" style="margin:5px"></span>
+			<div class="form-line">
+				<select name="tags" id="tagsnew" class="form-control no-default-select" multiple></select>
+			</div>
 		</div>
 	</div>
 </div>

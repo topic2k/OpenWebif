@@ -8,8 +8,8 @@ import requests
 
 TARGET_URL_BASE_FMT = 'http://{host}/file'
 
-from movie_files_testsuite import dump_disclaimer
-from movie_files_testsuite import ENV_VAR, ENV_VAL_FALLBACK
+from hardware_safety import require_hardware_access
+from movie_files_testsuite import dump_disclaimer, ENV_VAR
 
 
 class TestEnigma2FileAPICalls(unittest.TestCase):
@@ -19,7 +19,10 @@ class TestEnigma2FileAPICalls(unittest.TestCase):
 	"""
 
 	def setUp(self):
-		self.enigma2_host = os.environ.get(ENV_VAR, ENV_VAL_FALLBACK)
+		try:
+			self.enigma2_host = require_hardware_access(os.environ.get(ENV_VAR))
+		except RuntimeError as error:
+			self.skipTest(str(error))
 		self.file_url = TARGET_URL_BASE_FMT.format(host=self.enigma2_host)
 
 	def test_etc_passwd(self):

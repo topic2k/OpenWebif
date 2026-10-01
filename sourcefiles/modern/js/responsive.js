@@ -1,8 +1,12 @@
 var standby_status = -1;
 var timerFormInitiated = - 1;
+var timerTagChoices = null;
+var timerTagOptions = [];
 
 
 $(function () {
+	getStatusInfo();
+	setInterval(getStatusInfo, 3000);
 
 	if(!timeredit_initialized)
 		$('#editTimerForm').load('ajax/edittimer');
@@ -51,6 +55,7 @@ $(function () {
 	});
 
 	$('#TimerModal').on('hidden.bs.modal', function (e) {
+		resetTimerTagDropdown();
 	});
 
 	autosize($('textarea.auto-growth'));
@@ -78,8 +83,6 @@ $(function () {
 	});
 	*/
 	WebConfig();
-  
-	setInterval(function () { getStatusInfo(); }, 3000);
 });
 
 function initJsTranslationAddon(strings) {
@@ -318,9 +321,8 @@ function grabScreenshot(mode) {
 
 getStatusInfo = function(){
   // redefine classic version of same function
-	$("#osd__connection").toggle(!navigator.onLine);
-
-  navigator.onLine && owif.api.getStatusInfo().then(function(statusinfo) { 
+	owif.api.getStatusInfo().then(function(statusinfo) {
+		$("#osd__connection").hide();
 		let responsive_mute_status = '';
 		if (statusinfo['muted'] == true) {
 			mutestatus = 1;
@@ -369,6 +371,8 @@ getStatusInfo = function(){
 		}
 
 		$('body').toggleClass('standby-mode', statusinfo['inStandby'] === 'true');
+	}).catch(function() {
+		$("#osd__connection").show();
 	});
 }
 
@@ -447,6 +451,85 @@ function loadtimeredit(id, ref) {
 	$("#eventdescriptionII").load(url);
 }
 
+function positionTimerTagDropdown() {
+	let modal = document.getElementById('TimerModal');
+	if (!modal.classList.contains('timer-tags-open')) return;
+	let choices = document.querySelector('#editTimerForm .choices');
+	let dropdown = document.querySelector('#timer-tag-overlay .choices__list--dropdown');
+	let list = dropdown.querySelector('.choices__list');
+	let rect = choices.getBoundingClientRect();
+	let limit = Math.floor(window.innerHeight * 0.9);
+	let below = Math.max(0, limit - rect.bottom);
+	let above = Math.max(0, rect.top - Math.floor(window.innerHeight * 0.1));
+	let openAbove = rect.top < limit && below < 120 && above > below;
+	let available = Math.min(list.scrollHeight, openAbove ? above : below);
+	dropdown.style.top = (openAbove ? rect.top - available : rect.bottom) + 'px';
+	dropdown.style.left = rect.left + 'px';
+	dropdown.style.width = rect.width + 'px';
+	dropdown.style.maxHeight = available + 'px';
+	list.style.maxHeight = available + 'px';
+	dropdown.classList.add('timer-tags-positioned');
+}
+
+function resetTimerTagDropdown() {
+	let modal = document.getElementById('TimerModal');
+	modal.classList.remove('timer-tags-open');
+	let dropdown = document.querySelector('#timer-tag-overlay .choices__list--dropdown');
+	if (!dropdown) return;
+	dropdown.classList.remove('timer-tags-positioned');
+	for (let property of ['top', 'left', 'width', 'maxHeight']) dropdown.style[property] = '';
+	dropdown.querySelector('.choices__list').style.maxHeight = '';
+}
+
+function initTimerTags(tags) {
+	if (!timerTagChoices) {
+		let tagElement = document.getElementById('tagsnew');
+		timerTagChoices = new Choices(tagElement, Object.assign({}, owif.gui.choicesConfig, {
+			addChoices: true,
+			position: 'bottom',
+			shouldSort: true
+		}));
+		let dropdown = document.querySelector('#editTimerForm .choices__list--dropdown');
+		document.getElementById('timer-tag-overlay').appendChild(dropdown);
+		dropdown.addEventListener('mousedown', function(event) {
+			timerTagChoices._onMouseDown(event);
+		}, true);
+		dropdown.addEventListener('click', function(event) {
+			event.stopPropagation();
+		});
+		tagElement.addEventListener('showDropdown', function() {
+			document.getElementById('TimerModal').classList.add('timer-tags-open');
+			positionTimerTagDropdown();
+		});
+		tagElement.addEventListener('hideDropdown', resetTimerTagDropdown);
+		tagElement.addEventListener('search', function() {
+			requestAnimationFrame(positionTimerTagDropdown);
+		});
+		document.querySelector('#TimerModal .modal-body').addEventListener('scroll', positionTimerTagDropdown);
+		document.getElementById('TimerModal').addEventListener('scroll', positionTimerTagDropdown);
+		window.addEventListener('resize', positionTimerTagDropdown);
+		let tagInput = document.querySelector('#editTimerForm .choices__input--cloned');
+		document.addEventListener('keydown', function(event) {
+			if (event.target !== tagInput || event.key !== 'Enter') return;
+			let tag = tagInput.value.trim().replace(/\s+/g, '_');
+			if (!tag || timerTagOptions.includes(tag)) return;
+			event.preventDefault();
+			event.stopImmediatePropagation();
+			timerTagChoices.setChoices([{value: tag, label: tag}], 'value', 'label', false);
+			timerTagChoices.setChoiceByValue(tag);
+			timerTagOptions.push(tag);
+			tagInput.value = '';
+			tagInput.dispatchEvent(new Event('input', {bubbles: true}));
+		}, true);
+	}
+	let selected = (tags || '').trim().split(/\s+/).filter(Boolean);
+	let available = [...new Set(_tags.concat(selected))];
+	timerTagOptions = available;
+	timerTagChoices.removeActiveItems();
+	timerTagChoices.setChoices(available.map(tag => ({value: tag, label: tag})), 'value', 'label', true);
+	timerTagChoices.setChoiceByValue(selected);
+}
+
 function initTimerEdit(radio, callback) {
 	
 	let bottomhalf = function() {
@@ -457,13 +540,6 @@ function initTimerEdit(radio, callback) {
 		$('#dirname').append($("<option></option>").attr("value", loc).text(loc));
 	}
 	$("#dirname").selectpicker("refresh");
-	$('#tagsnew').html('');
-	for (let id in _tags) {
-		let tag = _tags[id];
-		$('#tagsnew').append("<input type='checkbox' name='"+tag+"' value='"+tag+"' id='tag_"+tag+"'/><label for='tag_"+tag+"'>"+tag+"</label>");
-	}
-	
-	$("#tagsnew > input").checkboxradio({icon: false});
 	
 	timeredit_initialized = true;
 		callback();
@@ -643,7 +719,7 @@ function addTimer(evt,chsref,chname,top) {
 		$('#day'+i).prop('checked', false);
 	}
 	
-	$('#tagsnew > input').prop('checked',false).checkboxradio("refresh");
+	initTimerTags('');
 
 	let begindate = begin !== -1 ? new Date( (Math.round(begin) - margin_before*60) * 1000) : new Date();
 	$('#timerbegin').datetimepicker('setDate', begindate);
@@ -692,6 +768,7 @@ function editTimer(serviceref, begin, end, evtid) {
 	$('#cbradio').prop('checked',radio);
 	
 	let bottomhalf = function() {
+	initTimerTags('');
 	
 	if (timeredit_begindestroy) {
 		initTimerEditBegin();
@@ -736,24 +813,7 @@ function editTimer(serviceref, begin, end, evtid) {
 								flags >>= 1;
 							}
 							
-							$('#tagsnew > input').prop('checked',false) //.checkboxradio("refresh");
-							
-							let tags = timer.tags.split(' ');
-							for (let j=0; j<tags.length; j++) {
-								let tag = tags[j].replace(/\(/g,'_').replace(/\)/g,'_').replace(/\'/g,'_');
-								if (tag.length>0)
-								{
-									if($('#tag_'+tag).length)
-									{
-										$('#tag_'+tag).prop('checked', true).checkboxradio("refresh");
-									}
-									else
-									{
-										$('#tagsnew').append("<input type='checkbox' checked='checked' name='"+tag+"' value='"+tag+"' id='tag_"+tag+"'/><label for='tag_"+tag+"'>"+tag+"</label>");
-							}
-								}
-							}
-							$("#tagsnew > input").checkboxradio({icon: false});
+							initTimerTags(timer.tags);
 							
 							$('#timerbegin').datetimepicker('setDate', (new Date(Math.round(timer.begin) * 1000)));
 							$('#timerend').datetimepicker('setDate', (new Date(Math.round(timer.end) * 1000)));
@@ -995,13 +1055,8 @@ function btn_saveTimer() {
 				$('[name="repeated"]:checked').each(function() {
 					repeated += parseInt($(this).val());
 				});
-				let tags = "";
-				$('[name="tagsnew"]:checked').each(function() {
-					if(tags!="")
-						tags+=" ";
-					tags += $(this).val();
-					
-				});
+				let selectedTags = timerTagChoices.getValue(true);
+				let tags = selectedTags.join(' ');
 				let urldata = { sRef: $('#bouquet_select').val(),
 					end: enddate,
 					name: $('#timername').val(),
@@ -1091,6 +1146,9 @@ function btn_saveTimer() {
 				}
 				
 				if (canclose) {
+					selectedTags.forEach(tag => {
+						if (!_tags.includes(tag)) _tags.push(tag);
+					});
 					refreshEpgTimers();
 					if (reloadTimers) {
 							if ( lastcontenturl.startsWith('ajax/timers') ) {
@@ -1259,6 +1317,21 @@ function showErrorMain(txt,st)
 		$('#statuscont').hide();
 	}
 	
+}
+
+function startInstantRecord() {
+	let button = document.getElementById('osd__current-event__record');
+	if (!button || button.disabled) return;
+	button.disabled = true;
+	return owif.stb.instantRecord().then(function(response) {
+		let success = response && (response.result === true || response.result === 'true' || response.result === 'True');
+		showErrorMain(response && response.message || tstr_oops, success);
+		if (success) getStatusInfo();
+	}).catch(function(error) {
+		showErrorMain(error.message || tstr_oops, false);
+	}).finally(function() {
+		button.disabled = false;
+	});
 }
 
 function deleteTimer(sRef, begin, end, title, callback) {

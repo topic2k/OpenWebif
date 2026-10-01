@@ -31,6 +31,7 @@ from .models.services import getBouquets, getChannels, getAllServices, getSatell
 from .models.info import getInfo
 from .models.movies import getMovieList, getMovieInfo
 from .models.timers import getTimers
+from .models.tagmanager import get_known_tags, get_tag_usage_for_session
 from .models.config import getConfigs, getConfigsSections
 from .models.stream import GetSession, getLive555HlsWebTVBase
 from .base import BaseController
@@ -236,6 +237,15 @@ class AjaxController(BaseController):
 			timers['sort'] = sorttype
 		timers['compacttimerlist'] = config.OpenWebif.webcache.compacttimerlist.value
 		return timers
+
+	def P_tagmanager(self, request):
+		tags = get_known_tags()
+		try:
+			usage = get_tag_usage_for_session(tags, self.session, config.movielist.videodirs.value[:] or None)
+		except Exception as err:
+			print(f'[OpenWebif] Unable to determine tag usage: {err}')
+			usage = None
+		return {'tags': tags, 'usage': usage}
 
 	# http://enigma2/ajax/tvradio
 	# (`classic` interface only)

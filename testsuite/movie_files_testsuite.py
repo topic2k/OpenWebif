@@ -7,6 +7,8 @@ import uuid
 import tempfile
 import requests
 
+from hardware_safety import require_hardware_access
+
 #: movie folder
 MOVIE_FOLDER = '/media/hdd/movie'
 
@@ -27,8 +29,6 @@ EXPECTED_FILES = [
 ]
 
 ENV_VAR = "ENIGMA2_HTTP_API_HOST"
-
-ENV_VAL_FALLBACK = "127.0.0.1"
 
 EXPECTED_MOVIE_ITEM = {
 	u'filename_stripped': u'20170830 1650 - TNT Serie HD (S) - Animal Kingdom - S\xfcndenbock.ts',
@@ -61,11 +61,15 @@ class MoviefilesTestCase(unittest.TestCase):
 	maxDiff = None
 
 	def setUp(self):
+		try:
+			self.enigma2_host = require_hardware_access(os.environ.get(ENV_VAR))
+		except RuntimeError as error:
+			self.skipTest(str(error))
 		self.test_filename = uuid.uuid4().hex + '-test.file'
-		self.test_file = tempfile.mktemp()  # NOSONAR
-		with open(self.test_file, "wb") as tgt:
-			tgt.write("TEST1234")
-		self.enigma2_host = os.environ.get(ENV_VAR, ENV_VAL_FALLBACK)
+		with tempfile.NamedTemporaryFile(delete=False) as tgt:
+			self.test_file = tgt.name
+			self.addCleanup(os.unlink, self.test_file)
+			tgt.write(b"TEST1234")
 		self.file_controller_url = "http://{netloc}/fs?dir={dir}".format(
 			netloc=self.enigma2_host, dir=MOVIE_FOLDER)
 		self.api_controller_url = "http://{netloc}/api/movielist".format(
@@ -133,13 +137,10 @@ class MoviefilesTestCase(unittest.TestCase):
 
 
 def dump_disclaimer(tow_files=False):
-	print("In order for this test to work the environment variable")
+	print("Live receiver tests are disabled by default. They require")
+	print("OPENWEBIF_ALLOW_HARDWARE_TESTS=YES and the environment variable")
 	print(">>> {var: ^70} <<<".format(var=ENV_VAR))
-	print("needs to be set to the hostname/network location of an "
-		  "enigma2 device reachable by this script!")
-	print("If this is not the case, the fallback value")
-	print(">>> {val: ^70} <<<".format(val=ENV_VAL_FALLBACK))
-	print("will be used!")
+	print("must explicitly name a disposable test receiver!")
 	if tow_files:
 		print("")
 		print("Following example files need to be put in {dir}:".format(
@@ -148,8 +149,7 @@ def dump_disclaimer(tow_files=False):
 		for file_item in EXPECTED_FILES:
 			print("* {!r}".format(file_item))
 	print("")
-	print("We will be using the network location {val!r} for this test".format(
-		val=os.environ.get(ENV_VAR, ENV_VAL_FALLBACK)))
+	print("Requested test target: {val!r}".format(val=os.environ.get(ENV_VAR)))
 	print("")
 	print("")
 
