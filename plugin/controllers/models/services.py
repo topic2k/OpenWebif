@@ -18,7 +18,7 @@
 # Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
 ##########################################################################
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import OrderedDict
 from re import search, sub, IGNORECASE
 from os.path import isfile, join as pathjoin, basename
@@ -1146,6 +1146,31 @@ def getMultiEpg(self, ref, begintime=-1, endtime=None, mode=1, modern=False):
 			}
 		return timerdetails
 
+	def repeatedOccurrences(timer, event_begin):
+		begin = datetime.fromtimestamp(timer.begin)
+		end = datetime.fromtimestamp(timer.end)
+		end_offset = end.date() - begin.date()
+		event_date = datetime.fromtimestamp(event_begin).date()
+		original_event_begin = getattr(timer, 'eventBegin', None)
+		if original_event_begin:
+			original_event_begin = datetime.fromtimestamp(original_event_begin)
+		else:
+			original_event_begin = None
+		for day in (event_date - timedelta(days=1), event_date):
+			if not timer.repeated & (1 << day.weekday()):
+				continue
+			occurrence_begin = int(mktime((day.year, day.month, day.day, begin.hour, begin.minute, begin.second, -1, -1, -1)))
+			if occurrence_begin < timer.begin:
+				continue
+			end_day = day + end_offset
+			occurrence_end = int(mktime((end_day.year, end_day.month, end_day.day, end.hour, end.minute, end.second, -1, -1, -1)))
+			occurrence_event_begin = None
+			if original_event_begin is not None:
+				event_day = day + (original_event_begin.date() - begin.date())
+				occurrence_event_begin = int(mktime((event_day.year, event_day.month, event_day.day,
+					original_event_begin.hour, original_event_begin.minute, original_event_begin.second, -1, -1, -1)))
+			yield occurrence_begin, occurrence_end, occurrence_event_begin
+
 	ret = OrderedDict()
 	channelnames = {}
 	channelrefs = {}
@@ -1186,6 +1211,7 @@ def getMultiEpg(self, ref, begintime=-1, endtime=None, mode=1, modern=False):
 			event_begin = getattr(timer, 'eventBegin', None)
 			if timer.begin <= lastevent and (
 				timer.end >= timer_start or
+				(modern and getattr(timer, 'repeated', 0)) or
 				(modern and timer.justplay and event_begin is not None and offset <= event_begin <= lastevent)
 			):
 				if str(timer.service_ref) not in timerlist:
@@ -1211,18 +1237,27 @@ def getMultiEpg(self, ref, begintime=-1, endtime=None, mode=1, modern=False):
 			timer = None
 			if sref in timerlist and len(timerlist[sref]) > 0:
 				for i, first in enumerate(timerlist[sref]):
-					covers_event = first.begin <= event[1] and end - 120 <= first.end
-					event_begin = getattr(first, 'eventBegin', None)
-					short_zap = first.justplay and (
-						event_begin == event[1] or
-						(getattr(first, 'eit', None) and first.eit == event[0]) or
-						(not getattr(first, 'eit', None) and event_begin is None and event[1] <= first.begin < end)
-					)
-					if covers_event or (modern and short_zap):
-						timer = getTimerDetails(first)
-						if modern:
-							timer.update({'sref': str(first.service_ref), 'begin': first.begin, 'end': first.end})
-						timerlist[sref] = timerlist[sref][i:]
+					repeated = modern and getattr(first, 'repeated', 0)
+					if repeated:
+						occurrences = repeatedOccurrences(first, event[1])
+					else:
+						occurrences = ((first.begin, first.end, getattr(first, 'eventBegin', None)),)
+					for occurrence_begin, occurrence_end, event_begin in occurrences:
+						covers_event = occurrence_begin <= event[1] and end - 120 <= occurrence_end
+						short_zap = first.justplay and (
+							event_begin == event[1] or
+							(repeated and event_begin is None and event[1] <= occurrence_begin < end) or
+							(not repeated and getattr(first, 'eit', None) and first.eit == event[0]) or
+							(not repeated and not getattr(first, 'eit', None) and event_begin is None and event[1] <= first.begin < end)
+						)
+						if covers_event or (modern and short_zap):
+							timer = getTimerDetails(first)
+							if modern:
+								timer.update({'sref': str(first.service_ref), 'begin': first.begin, 'end': first.end})
+							timerlist[sref] = [prior for prior in timerlist[sref][:i]
+								if modern and getattr(prior, 'repeated', 0)] + timerlist[sref][i:]
+							break
+					if timer:
 						break
 
 			ev = {

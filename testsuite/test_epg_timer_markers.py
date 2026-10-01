@@ -2,6 +2,7 @@ import ast
 import importlib.util
 import json
 from collections import OrderedDict
+from datetime import datetime, timedelta
 from html import unescape
 from pathlib import Path
 from time import localtime, mktime
@@ -38,13 +39,16 @@ class EpgTimerMarkerTests(unittest.TestCase):
         return {'id': 1, 'ref': '1:0:1:', 'begin_timestamp': 1000, 'duration': 3600,
                 'title': 'Test', 'shortdesc': 'Description', 'timer': timer}
 
-    def epg_events(self, timers, mode, modern=True, begin_time=None):
+    def epg_events(self, timers, mode, modern=True, begin_time=None, events=None):
         start = int(mktime((2026, 9, 28, 0, 0, 0, -1, -1, -1)))
         ref = '1:0:1:'
-        events = [(10 + i, start + i * 3600, 'Event', 'Description', ref, 'Channel', 3600)
-                  for i in range(3)]
+        if events is None:
+            events = [(10 + i, start + i * 3600, 'Event', 'Description', ref, 'Channel', 3600)
+                      for i in range(3)]
         namespace = {
             'OrderedDict': OrderedDict,
+            'datetime': datetime,
+            'timedelta': timedelta,
             'eServiceCenter': SimpleNamespace(getInstance=lambda: SimpleNamespace(
                 list=lambda _: SimpleNamespace(getContent=lambda _: [ref]))),
             'eServiceReference': lambda value: value,
@@ -119,6 +123,75 @@ class EpgTimerMarkerTests(unittest.TestCase):
                                         end=start + 3601, eit=42, disabled=0, justplay=1)
             with self.subTest(mode=mode, expected=None):
                 self.assertTrue(all(event['timer'] is None for event in self.epg_events([wrong_eit], mode)))
+
+    def test_repeated_recording_marks_selected_weekdays_not_other_broadcasts(self):
+        monday = int(mktime((2026, 9, 28, 0, 0, 0, -1, -1, -1)))
+        timer = SimpleNamespace(service_ref='1:0:1:', begin=monday + 3540,
+                                end=monday + 7260, repeated=1 | 2,
+                                disabled=0, justplay=0)
+        for mode in (1, 2):
+            for day, marked in ((28, True), (29, True), (30, False), (5, True)):
+                month = 9 if day >= 28 else 10
+                day_start = int(mktime((2026, month, day, 0, 0, 0, -1, -1, -1)))
+                events = [(day, day_start + hour * 3600, 'Galileo', 'Description',
+                           '1:0:1:', 'Channel', 3600) for hour in (1, 3)]
+                with self.subTest(mode=mode, day=day):
+                    result = self.epg_events([timer], mode, begin_time=day_start + 3630, events=events)
+                    self.assertEqual([bool(event['timer']) for event in result], [marked, False])
+                    if marked:
+                        self.assertEqual((result[0]['timer']['begin'], result[0]['timer']['end']),
+                                         (timer.begin, timer.end))
+
+        tuesday = int(mktime((2026, 9, 29, 0, 0, 0, -1, -1, -1)))
+        event = [(20, tuesday + 3600, 'Galileo', 'Description', '1:0:1:', 'Channel', 3600)]
+        for mode in (1, 2):
+            with self.subTest(mode=mode, modern=False):
+                self.assertIsNone(self.epg_events([timer], mode, modern=False,
+                                                   begin_time=tuesday, events=event)[0]['timer'])
+
+    def test_repeated_overnight_recording_uses_start_weekday(self):
+        monday = int(mktime((2026, 9, 28, 0, 0, 0, -1, -1, -1)))
+        timer = SimpleNamespace(service_ref='1:0:1:', begin=monday + 23 * 3600 + 29 * 60,
+                                end=int(mktime((2026, 9, 29, 0, 32, 0, -1, -1, -1))),
+                                repeated=1, disabled=0, justplay=0)
+        for mode in (1, 2):
+            for day, expected in ((29, True), (5, False), (6, True)):
+                month = 9 if day == 29 else 10
+                event_start = int(mktime((2026, month, day, 0, 0, 0, -1, -1, -1)))
+                events = [(day, event_start, 'After midnight', 'Description',
+                           '1:0:1:', 'Channel', 1800)]
+                with self.subTest(mode=mode, day=day):
+                    result = self.epg_events([timer], mode, begin_time=event_start, events=events)
+                    self.assertEqual(bool(result[0]['timer']), expected)
+
+    def test_repeated_zap_matches_event_time_even_when_eit_changes(self):
+        monday = int(mktime((2026, 9, 28, 0, 0, 0, -1, -1, -1)))
+        tuesday = int(mktime((2026, 9, 29, 0, 0, 0, -1, -1, -1)))
+        events = [(20 if hour == 1 else 10, tuesday + hour * 3600, 'Galileo', 'Description',
+                   '1:0:1:', 'Channel', 3600) for hour in (1, 3)]
+        for event_begin, timer_begin in ((None, monday + 3600), (monday + 3600, monday + 3300)):
+            timer = SimpleNamespace(service_ref='1:0:1:', begin=timer_begin,
+                                    end=timer_begin + 1, eventBegin=event_begin, eit=10,
+                                    repeated=3, disabled=0, justplay=1)
+            for mode in (1, 2):
+                with self.subTest(mode=mode, event_begin=event_begin):
+                    result = self.epg_events([timer], mode, begin_time=tuesday, events=events)
+                    self.assertEqual([bool(event['timer']) for event in result], [True, False])
+                    self.assertEqual((result[0]['timer']['begin'], result[0]['timer']['end']),
+                                     (timer.begin, timer.end))
+
+    def test_repeated_timer_remains_available_after_other_timer_matches(self):
+        monday = int(mktime((2026, 9, 28, 0, 0, 0, -1, -1, -1)))
+        repeated = SimpleNamespace(service_ref='1:0:1:', begin=monday + 5 * 3600,
+                                   end=monday + 6 * 3600, repeated=3, disabled=0, justplay=0)
+        once = SimpleNamespace(service_ref='1:0:1:', begin=monday + 3 * 3600,
+                               end=monday + 4 * 3600, disabled=0, justplay=0)
+        events = [(10, monday + hour * 3600, 'Event', 'Description',
+                   '1:0:1:', 'Channel', 3600) for hour in (3, 5)]
+        for mode in (1, 2):
+            with self.subTest(mode=mode):
+                result = self.epg_events([repeated, once], mode, begin_time=monday, events=events)
+                self.assertEqual([event['timer']['begin'] for event in result], [once.begin, repeated.begin])
 
     def test_classic_epg_keeps_existing_short_timer_behavior(self):
         start = int(mktime((2026, 9, 28, 0, 0, 0, -1, -1, -1)))
