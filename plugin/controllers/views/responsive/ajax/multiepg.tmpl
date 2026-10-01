@@ -25,6 +25,20 @@
 	.plusclick { font-size: 14px; }
 	.navtab-active { cursor: pointer; margin-right:8px; font-weight: bold; border-bottom-width: 2px; border-bottom-style: solid; background-color: transparent !important; bottom: 2px;}
 	.navtab-inactive { cursor: pointer; margin-right:8px; border:None; background-color: transparent !important;  }
+	#epg-calendar-wrap { position: relative; }
+	.epg-calendar__toggle { border: 0; background: transparent; padding: 0 8px 0 0; cursor: pointer; color: inherit; }
+	.epg-calendar__toggle .material-icons { font-size: 20px; vertical-align: middle; }
+	.epg-calendar { display: none; position: absolute; top: 100%; left: 0; z-index: 30; width: 284px; padding: 10px; background: #fff; color: #333; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35); border-radius: 4px; }
+	.theme--city-lights .epg-calendar { background: #282c37; color: #fff; }
+	.theme--neon-blackout .epg-calendar { background: #000; color: #fff; }
+	.epg-calendar__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+	.epg-calendar__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+	.epg-calendar__grid > span { padding: 5px 0; }
+	.epg-calendar button { border: 0; background: transparent; color: inherit; cursor: pointer; padding: 5px 0; }
+	.epg-calendar__grid button:hover, .epg-calendar__grid button:focus-visible { background: rgba(127, 127, 127, 0.25); }
+	.epg-calendar__grid button.has-epg { font-weight: bold; }
+	.epg-calendar__grid button.is-selected { outline: 2px solid var(--skin-color, #0fb8fb); }
+	#navepg > .nav-tabs.epg-calendar-open { overflow: visible; }
 	.timer { font-weight: bold; font-size: 10px; color:red; }
 	#eventdescription { width: 375px; height: auto; position: fixed; top: 205px; left: 350px; z-index: 100; display: none; overflow: auto; }
 	#navepg { margin-bottom: 1px; }
@@ -121,6 +135,19 @@
 <div id="navepg">
 #set $epgdate = $localtime($slot_start)
 <ul class="nav nav-tabs tab--skinned" style="margin-top: -10px;height:auto;">
+<li id="epg-calendar-wrap">
+	<button type="button" id="epg-calendar-toggle" class="epg-calendar__toggle" data-bref="$escape($bref, quote=True)" aria-label="$tstrings['date']" title="$tstrings['date']" aria-expanded="false" aria-controls="epg-calendar-popup"><i class="material-icons" aria-hidden="true">date_range</i></button>
+	<div id="epg-calendar-popup" class="epg-calendar" role="dialog" aria-label="$tstrings['date']">
+		<div class="epg-calendar__header">
+			<button type="button" id="epg-calendar-prev" aria-label="$tstrings['date']">&lsaquo;</button>
+			<strong id="epg-calendar-month"></strong>
+			<button type="button" id="epg-calendar-next" aria-label="$tstrings['date']">&rsaquo;</button>
+		</div>
+		<div id="epg-calendar-grid" class="epg-calendar__grid">
+			<span>$tstrings['day_1']</span><span>$tstrings['day_2']</span><span>$tstrings['day_3']</span><span>$tstrings['day_4']</span><span>$tstrings['day_5']</span><span>$tstrings['day_6']</span><span>$tstrings['day_0']</span>
+		</div>
+	</div>
+</li>
 #for $slot in list(range(0,7))
 	<li><div class="plusclick navtab-#if $slot==$day then 'active' else 'inactive' #" data-day="$(slot)">$tstrings[("day_" + (time.strftime("%w", time.localtime(time.time()+86400*slot))))]</div></li>
 #end for
@@ -464,6 +491,100 @@ jQuery(".bq").click(function() {
 	jQuery("#tvcontent").html(loadspinner).load('ajax/multiepg?bref='+id +'&day=$day&epgmode=' + epgmode);
 	SetLSValue("lastmbq_"+epgmode,id);
 });
+
+function epgCalendarDayOffset(selected, today) {
+	return Math.round((Date.UTC(selected.getFullYear(), selected.getMonth(), selected.getDate()) -
+		Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000);
+}
+
+(function() {
+	var toggle = jQuery('#epg-calendar-toggle');
+	var popup = jQuery('#epg-calendar-popup');
+	var nav = toggle.closest('.nav-tabs');
+	var grid = jQuery('#epg-calendar-grid');
+	var selected = new Date();
+	selected.setHours(12, 0, 0, 0);
+	selected.setDate(selected.getDate() + $day + $week * 7);
+	var calendarYear = selected.getFullYear();
+	var calendarMonth = selected.getMonth();
+	var bouquet = toggle.attr('data-bref');
+	var available = window.epgCalendarDaysCache || (window.epgCalendarDaysCache = {});
+	var watched = {};
+
+	function loadCalendarDays(year, month) {
+		var key = JSON.stringify([bouquet, year, month]);
+		var entry = available[key];
+		if (!entry) entry = available[key] = {days: null, updated: 0, request: null};
+		if (!entry.request && (!entry.days || Date.now() - entry.updated >= 60000)) {
+			entry.request = jQuery.getJSON('api/epgcalendar?bref=' + encodeURIComponent(bouquet) + '&year=' + year + '&month=' + (month + 1))
+				.done(function(data) {
+					if (data.result) {
+						entry.days = new Set(data.days);
+						entry.updated = Date.now();
+					}
+				}).always(function() { entry.request = null; });
+		}
+		if (entry.request && watched[key] !== entry.request) {
+			watched[key] = entry.request;
+			entry.request.done(function(data) {
+				if (data.result && jQuery.contains(document, popup[0]) && popup.is(':visible') && year === calendarYear && month === calendarMonth) renderCalendar();
+			});
+		}
+		return entry.days;
+	}
+
+	function renderCalendar() {
+		var year = calendarYear;
+		var month = calendarMonth;
+		var days = loadCalendarDays(year, month);
+		jQuery('#epg-calendar-month').text(new Date(year, month, 1).toLocaleDateString(undefined, {month: 'long', year: 'numeric'}));
+		grid.find('button, .epg-calendar__blank').remove();
+		var blanks = (new Date(year, month, 1).getDay() + 6) % 7;
+		for (var gap = 0; gap < blanks; gap++) grid.append('<span class="epg-calendar__blank"></span>');
+		var count = new Date(year, month + 1, 0).getDate();
+		for (var number = 1; number <= count; number++) {
+			var date = new Date(year, month, number);
+			var dayKey = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(number).padStart(2, '0');
+			var button = jQuery('<button type="button"></button>').text(number).attr('title', date.toLocaleDateString()).data('date', date);
+			button.toggleClass('has-epg', !!(days && days.has(dayKey)));
+			button.toggleClass('is-selected', epgCalendarDayOffset(date, selected) === 0);
+			grid.append(button);
+		}
+	}
+
+	toggle.on('click', function(event) {
+		event.stopPropagation();
+		popup.toggle();
+		nav.toggleClass('epg-calendar-open', popup.is(':visible'));
+		toggle.attr('aria-expanded', popup.is(':visible') ? 'true' : 'false');
+		if (popup.is(':visible')) renderCalendar();
+	});
+	jQuery('#epg-calendar-prev, #epg-calendar-next').on('click', function() {
+		var change = this.id === 'epg-calendar-next' ? 1 : -1;
+		var month = new Date(calendarYear, calendarMonth + change, 1);
+		calendarYear = month.getFullYear();
+		calendarMonth = month.getMonth();
+		renderCalendar();
+	});
+	grid.on('click', 'button', function() {
+		var date = jQuery(this).data('date');
+		jQuery('#tvcontent').html(loadspinner).load('ajax/multiepg?bref=' + encodeURIComponent(bouquet) + '&day=' + epgCalendarDayOffset(date, new Date()) + '&epgmode=$epgmode&week=0');
+	});
+	jQuery(document).off('click.epgCalendar keydown.epgCalendar').on('click.epgCalendar', function(event) {
+		if (!jQuery(event.target).closest('#epg-calendar-wrap').length) {
+			popup.hide();
+			nav.removeClass('epg-calendar-open');
+			toggle.attr('aria-expanded', 'false');
+		}
+	}).on('keydown.epgCalendar', function(event) {
+		if (event.key === 'Escape') {
+			popup.hide();
+			nav.removeClass('epg-calendar-open');
+			toggle.attr('aria-expanded', 'false').trigger('focus');
+		}
+	});
+	loadCalendarDays(calendarYear, calendarMonth);
+})();
 
 #if $mode == 1
 jQuery(".service").click(function() {

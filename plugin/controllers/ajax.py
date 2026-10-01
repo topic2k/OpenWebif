@@ -317,6 +317,7 @@ class AjaxController(BaseController):
 		day = 0
 		week = 0
 		wadd = 0
+		modern = getViewsPath('ajax/multiepg.tmpl').startswith(f'{VIEWS_PATH}/responsive/')
 		_week = getUrlArg(request, "week")
 		if _week is not None:
 			try:
@@ -328,7 +329,7 @@ class AjaxController(BaseController):
 		if _day is not None:
 			try:
 				day = int(_day)
-				if day > 0 or wadd > 0:
+				if day > 0 or wadd > 0 or (modern and day < 0):
 					now = localtime()
 					begintime = int(mktime((now.tm_year, now.tm_mon, now.tm_mday + day + wadd, 0, 0, 0, -1, -1, -1)))
 			except ValueError:
@@ -339,7 +340,6 @@ class AjaxController(BaseController):
 				mode = int(config.OpenWebif.webcache.mepgmode.value)
 			except ValueError:
 				pass
-		modern = getViewsPath('ajax/multiepg.tmpl').startswith(f'{VIEWS_PATH}/responsive/')
 		epg = getMultiEpg(self, bref, begintime, endtime, mode, modern=modern)
 		epg['bouquets'] = bouq['bouquets']
 		epg['bref'] = bref

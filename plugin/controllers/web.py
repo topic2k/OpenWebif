@@ -25,7 +25,7 @@ from Components.config import config as comp_config
 from Screens.InfoBar import InfoBar
 
 from .models.info import getInfo, getCurrentTime, getStatusInfo, getFrontendStatus, testPipStatus
-from .models.services import getCurrentService, getBouquets, getServices, getSubServices, getSatellites, getBouquetEpg, getBouquetNowNextEpg, getMultiChannelNowNextEpg, getSearchEpg, getSimilarEpg, getChannelEpg, getNowNextEpg, getAllServices, getPlayableServices, getPlayableService, getParentalControlList, getEvent, getServiceRef, getPicon, getAllServicesRaw
+from .models.services import getCurrentService, getBouquets, getServices, getSubServices, getSatellites, getBouquetEpg, getBouquetNowNextEpg, getMultiChannelNowNextEpg, getSearchEpg, getSimilarEpg, getChannelEpg, getNowNextEpg, getAllServices, getPlayableServices, getPlayableService, getParentalControlList, getEvent, getServiceRef, getPicon, getAllServicesRaw, getEpgCalendarDays
 from .models.volume import getVolumeStatus, setVolumeUp, setVolumeDown, setVolumeMute, setVolume
 from .models.audiotrack import getAudioTracks, setAudioTrack
 from .models.control import zapService, remoteControl, setPowerState, getStandbyState
@@ -1585,7 +1585,18 @@ class WebController(BaseController):
 			"firstpublic": firstpublic
 		}
 
-	# http://enigma2/api/epgbouquet?bRef=1%3A7%3A1%3A0%3A0%3A0%3A0%3A0%3A0%3A0%3A%20FROM%20BOUQUET%20%22userbouquet.favourites.tv%22%20ORDER%20BY%20bouquet
+	def P_epgcalendar(self, request):
+		bref = getUrlArg(request, 'bref')
+		try:
+			year = int(getUrlArg(request, 'year'))
+			month = int(getUrlArg(request, 'month'))
+		except (TypeError, ValueError):
+			return {'result': False, 'days': []}
+		if not bref or year < 1970 or year > 2100 or month < 1 or month > 12:
+			return {'result': False, 'days': []}
+		return {'result': True, 'days': getEpgCalendarDays(bref, year, month)}
+
+	# http://enigma2/api/epgbouquet?bRef=1%3A7%3A1%3A0%3A0%3A0%3A0%3A0%3A0%3A0%3A0%3A0%3A0%3A0%3A0%3A%20FROM%20BOUQUET%20%22userbouquet.favourites.tv%22%20ORDER%20BY%20bouquet
 	# http://enigma2/web/epgbouquet?bRef=1%3A7%3A1%3A0%3A0%3A0%3A0%3A0%3A0%3A0%3A%20FROM%20BOUQUET%20%22userbouquet.favourites.tv%22%20ORDER%20BY%20bouquet
 	# TODO: this is _woefully_ inefficient
 	def P_epgbouquet(self, request):

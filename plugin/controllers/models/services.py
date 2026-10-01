@@ -18,12 +18,12 @@
 # Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
 ##########################################################################
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from collections import OrderedDict
 from re import search, sub, IGNORECASE
 from os.path import isfile, join as pathjoin, basename
 from urllib.parse import quote, unquote
-from time import time, localtime, strftime, mktime
+from time import time, localtime, strftime, mktime, monotonic
 from unicodedata import normalize
 from enigma import eServiceCenter, eServiceReference, iServiceInformation
 
@@ -40,6 +40,8 @@ from ..utilities import parse_servicereference, SERVICE_TYPE_LOOKUP, NS_LOOKUP
 from ..i18n import _, tstrings
 from ..defaults import STREAMRELAY, globalVars
 from .epg import EPG, convertGenre, getIPTVLink, filterName, convertDesc, GetWithAlternative
+
+_epgCalendarDaysCache = {}
 
 try:
 	from Components.Renderer.Picon import piconLocator
@@ -1113,6 +1115,42 @@ def getSimilarEpg(ref, eventid, encode=False):
 			ret.append(ev)
 
 	return {"events": ret, "result": True}
+
+
+def getEpgCalendarDays(ref, year, month):
+	key = (ref, year, month)
+	now = monotonic()
+	cached = _epgCalendarDaysCache.get(key)
+	if cached and now - cached[0] < 60:
+		return cached[1][:]
+
+	services = eServiceCenter.getInstance().list(eServiceReference(ref))
+	if not services:
+		return []
+	srefs = services.getContent('S')
+	if not srefs:
+		return []
+
+	first = date(year, month, 1)
+	last = (first + timedelta(days=32)).replace(day=1)
+	start = first - timedelta(days=1)
+	start_time = int(mktime((start.year, start.month, start.day, 0, 0, 0, -1, -1, -1)))
+	end_time = int(mktime((last.year, last.month, last.day, 0, 0, 0, -1, -1, -1)))
+	events = EPG().getMultiChannelEvents(srefs, start_time, (end_time - start_time) // 60 + 1, fields='BD') or []
+	days = set()
+	for begin, duration in events:
+		if begin is None or duration is None or duration <= 0:
+			continue
+		day = max(first, datetime.fromtimestamp(begin).date())
+		end_day = min(last - timedelta(days=1), datetime.fromtimestamp(begin + duration - 1).date())
+		while day <= end_day:
+			days.add(day.isoformat())
+			day += timedelta(days=1)
+	result = sorted(days)
+	if len(_epgCalendarDaysCache) >= 128:
+		_epgCalendarDaysCache.clear()
+	_epgCalendarDaysCache[key] = (now, result)
+	return result
 
 
 def getMultiEpg(self, ref, begintime=-1, endtime=None, mode=1, modern=False):
