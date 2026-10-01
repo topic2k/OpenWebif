@@ -207,6 +207,7 @@
 	.epg__channel-col {
 		position: sticky;
 		left: 0;
+		cursor: pointer;
 		z-index: 10;
 		width: 140px;
 		min-width: 140px;
@@ -467,6 +468,13 @@ jQuery(".bq").click(function() {
 #if $mode == 1
 jQuery(".service").click(function() {
 	var ref = jQuery(this).data("ref");
+	if (ref != undefined) {
+		zapChannel(ref, '');
+	}
+});
+#else
+jQuery(".epg__channel-col").click(function() {
+	var ref = jQuery(this).closest(".epg__timeline-row").data("ref");
 	if (ref != undefined) {
 		zapChannel(ref, '');
 	}
