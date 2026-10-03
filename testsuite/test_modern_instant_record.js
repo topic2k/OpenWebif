@@ -19,13 +19,15 @@ test('instant recording still requests the receiver API', async () => {
 	const source = readFileSync(join(root, 'sourcefiles/modern/js/owif.js'), 'utf8');
 	const stb = source.slice(source.indexOf('class STB {'), source.indexOf('\nclass API {'));
 	const requests = [];
-	const context = { fetch: async url => {
+	const context = { URL, window: {location: new URL('http://alice:secret@receiver.local/#at')}, $: {ajaxPrefilter() {}}, fetch: async url => {
 		requests.push(url);
 		return { ok: true, json: async () => ({ result: true, message: 'Recording started' }) };
 	} };
+	const bootstrap = template.match(/<script>\s*function owifRequestUrl[\s\S]*?<\/script>/)[0];
+	runInNewContext(bootstrap.replace(/^<script>|<\/script>$/g, ''), context);
 	runInNewContext(stb + '\nthis.STB = STB;', context);
 	assert.equal((await new context.STB().instantRecord()).result, true);
-	assert.deepEqual(requests, ['/api/recordnow?infinite=true']);
+	assert.deepEqual(requests, ['http://receiver.local/api/recordnow?infinite=true']);
 });
 
 function setup(instantRecord) {

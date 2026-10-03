@@ -59,7 +59,7 @@
   };
 
   const apiRequest = (url, options = {}) => {
-    return fetch(url, options)
+    return fetch(owifRequestUrl(url), options)
       .then((response) => {
         if (response.ok) {
           return response.json()

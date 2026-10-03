@@ -31,7 +31,7 @@ class Utils {
 
   fetchData = async (url, options = { method: 'get', ...{} }) => {
     try {
-      const response = await fetch(url, options);
+      const response = await fetch(owifRequestUrl(url), options);
 
       if (response.ok) {
         const contentType = response.headers.get('content-type');
@@ -92,7 +92,7 @@ class STB {
   constructor() {}
 
   async instantRecord() {
-    let response = await fetch('/api/recordnow?infinite=true'); // falls back to `infinite` if there's no event found
+    let response = await fetch(owifRequestUrl('/api/recordnow?infinite=true')); // falls back to `infinite` if there's no event found
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     } else {
@@ -106,7 +106,7 @@ class API {
   constructor() {}
 
   async getStatusInfo() {
-    let response = await fetch('/api/statusinfo');
+    let response = await fetch(owifRequestUrl('/api/statusinfo'));
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     } else {
@@ -116,7 +116,7 @@ class API {
   }
 
   async getTags() {
-    let response = await fetch('/api/gettags');
+    let response = await fetch(owifRequestUrl('/api/gettags'));
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     } else {
@@ -127,7 +127,7 @@ class API {
 
   async getAllServices(noiptv,cuttitle) {
     let niptv = (noiptv==true) ? "&noiptv=1" : "";
-    let response = await fetch('/api/getallservices?nolastscanned=1' + niptv);
+    let response = await fetch(owifRequestUrl('/api/getallservices?nolastscanned=1' + niptv));
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     } else {
@@ -175,7 +175,7 @@ class API {
   }
 
   async sendKeyboardText(text) {
-    const response = (typeof text == 'undefined') ? {'ok': false, 'status': 'Empty request'} : await fetch(`/api/remotecontrol?text=${text}`);
+    const response = (typeof text == 'undefined') ? {'ok': false, 'status': 'Empty request'} : await fetch(owifRequestUrl(`/api/remotecontrol?text=${text}`));
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     } else {
@@ -260,7 +260,7 @@ class GUI {
     const oldValue = self.skinPref;
 
     // TODO: success/failure message
-    fetch(`/api/setskincolor?skincolor=${newValue}`);
+    fetch(owifRequestUrl(`/api/setskincolor?skincolor=${newValue}`));
 
     document.body.classList.replace(`${cssClassPrefix}${oldValue}`, `${cssClassPrefix}${newValue}`);
     document.body.dataset.skinpref = newValue;

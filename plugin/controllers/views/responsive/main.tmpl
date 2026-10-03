@@ -65,6 +65,18 @@
 
 	<script src="/js/jquery-2.2.4.min.js"></script>
 	<script src="/js/jquery-ui-1.13.2.min.js"></script>
+	<script>
+		function owifRequestUrl(url) {
+			const requestUrl = new URL(url, window.location.href);
+			if (requestUrl.origin !== window.location.origin) return url;
+			requestUrl.username = '';
+			requestUrl.password = '';
+			return requestUrl.href;
+		}
+		$.ajaxPrefilter(function(options) {
+			options.url = owifRequestUrl(options.url);
+		});
+	</script>
 	<script src="/js/openwebif.min.js?v$__version__"></script>
 	<script src="/js/chosen-1.8.7.jquery.min.js"></script>
 	<script>initJsTranslation($dumps($tstrings))</script>
@@ -942,7 +954,7 @@
 ##   .filter((tag) => tag.tagName === 'script')
 ##   .join('')
 ## %>
-<script src="/modern/js/vendors-app.js?v=wp"></script><script src="/modern/js/owif-app.js?v1.2.36"></script>
+<script src="/modern/js/vendors-app.js?v=wp"></script><script src="/modern/js/owif-app.js?v1.2.41"></script>
 
 <script src="/modern/js/bootstrap-date-timepicker.min.js"></script>
 <script src="/modern/js/admin.min.js?v=wp"></script>
