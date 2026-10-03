@@ -219,6 +219,8 @@
 	.event { display: inline-block; border:solid; border-width: 0px 0px 0px 1px; padding: 0px 0px 0px 0px!important; margin:0px 0px 0px -3px!important;}
 	.event .ename,.event .etime,.event .etimer { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.event .ename,.event .etime,.event .etimer { position: relative; z-index: 6; }
+	.epg__timeline-info { display: block; position: relative; z-index: 6; width: max-content; max-width: 100%; }
+	.epg__timeline-info .ename { float: none; }
 	.channel-listing { list-style-type: none;}
 	.curevent { background: #e9e9e9; }
 	.etimesmall, .etime, .ename {
@@ -378,11 +380,13 @@
 	#end if
 					<li class="event$timerClass" data-ref="$ref" data-id="${event.id}" data-begin="${event.begin_timestamp}" data-end="$end" data-toggle="modal" data-target="#EventModal" onclick="if (event.target.closest('.epg__timer-marker')) return; loadeventepg('${event.id}', '$ref');return false;" style="width:${dur/6}px;padding:10px;">
 						<a href="javascript:void(0);" class="ui-widget-content ${iscurr}" title="$event['title']">
-							<span class="ename">$event['title']<span class="etimesmall"> ($strftime("%d.%m", $localtime($event['begin_timestamp'])))</span></span>
-							<span class="etime">$strftime("%H:%M", $localtime($event['begin_timestamp'])) - $strftime("%H:%M", $localtime($event['begin_timestamp'] + $event['duration']))</span>
+							<span class="epg__timeline-info">
+								<span class="ename">$event['title']<span class="etimesmall"> ($strftime("%d.%m", $localtime($event['begin_timestamp'])))</span></span>
+								<span class="etime">$strftime("%H:%M", $localtime($event['begin_timestamp'])) - $strftime("%H:%M", $localtime($event['begin_timestamp'] + $event['duration']))</span>
 #if $event['timerStatus'] != ''
-							<span class="etimer $event['timerStatus']">$tstrings['timer']</span>
+								<span class="etimer $event['timerStatus']">$tstrings['timer']</span>
 #end if
+							</span>
 						</a>
 #if $event['timer']
 	#set $timerMetadata = $escape($dumps({'sref': $quote($event['timer']['sref']), 'begin': $event['timer']['begin'], 'end': $event['timer']['end']}, separators=(',', ':')), quote=True)
@@ -480,6 +484,61 @@ function updateEpgDateRange() {
 		return epgDateLabels.weekdays[date.getDay()] + ', ' + date.getDate() + '.' + epgDateLabels.months[date.getMonth()] + ' ' + date.getFullYear();
 	}).join(' / ');
 }
+function epgKeepVisibleShift(start, end, size, edge) {
+	return Math.max(0, Math.min(edge - start, end - start - size));
+}
+(function() {
+	var container = document.getElementById('fulltbl');
+	var pending = false;
+	function update() {
+		pending = false;
+		if (document.getElementById('fulltbl') !== container) return;
+		var bounds = container.getBoundingClientRect();
+		if (container.classList.contains('epg__tv-guide')) {
+			var header = container.querySelector('.serviceheader');
+			var edge = bounds.top + (header ? header.offsetHeight : 0);
+			container.querySelectorAll('#tbl1body td.border').forEach(function(cell) {
+				var cellBounds = cell.getBoundingClientRect();
+				if (cellBounds.bottom <= edge || cellBounds.top >= bounds.bottom || cellBounds.right <= bounds.left || cellBounds.left >= bounds.right) return;
+				var events = cell.querySelectorAll('.epg__event');
+				events.forEach(function(event, index) {
+					var start = event.getBoundingClientRect().top - (event._epgShift || 0);
+					var next = events[index + 1];
+					var end = next ? next.getBoundingClientRect().top - (next._epgShift || 0) : cellBounds.bottom;
+					var shift = epgKeepVisibleShift(start, end, event.offsetHeight, edge);
+					event.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+					event._epgShift = shift;
+				});
+			});
+		} else {
+			var channel = container.querySelector('.epg__channel-col');
+			var edge = bounds.left + (channel ? channel.offsetWidth : 0);
+			container.querySelectorAll('.epg__timeline-row').forEach(function(row) {
+				var rowBounds = row.getBoundingClientRect();
+				if (rowBounds.bottom <= bounds.top || rowBounds.top >= bounds.bottom) return;
+				row.querySelectorAll('.eventlist .event[data-begin]').forEach(function(event) {
+					var eventBounds = event.getBoundingClientRect();
+					if (eventBounds.right <= edge || eventBounds.left >= bounds.right) return;
+					var info = event.querySelector('.epg__timeline-info');
+					var start = info.getBoundingClientRect().left - (info._epgShift || 0);
+					var shift = epgKeepVisibleShift(start, eventBounds.right, info.offsetWidth, edge);
+					info.style.transform = shift ? 'translateX(' + shift + 'px)' : '';
+					info._epgShift = shift;
+				});
+			});
+		}
+	}
+	function schedule() {
+		if (!pending) {
+			pending = true;
+			requestAnimationFrame(update);
+		}
+	}
+	container.addEventListener('scroll', schedule);
+	jQuery(window).off('resize.epgKeepVisible').on('resize.epgKeepVisible', schedule);
+	schedule();
+	setTimeout(schedule, 150);
+})();
 var reloadTimers = false;
 function getScrollBarWidth () {
 	var outer = jQuery('<div>').css({visibility: 'hidden', width: 100, overflow: 'scroll'}).appendTo('body'),
