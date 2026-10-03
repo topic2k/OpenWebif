@@ -12,6 +12,7 @@ test('modern header and bouquet editor use fresh, matching versions of their app
 	const version = main.match(/\/modern\/js\/responsive\.min\.js\?(v[\d.]+)"/)?.[1];
 	assert.ok(version, 'responsive script must be cache-busted');
 	assert.notEqual(version, 'v1.2.32', 'receiver currently delivers v1.2.32');
+	assert.ok(main.includes(`/modern/js/vendors-app.js?${version}"`));
 	assert.ok(main.includes(`/modern/js/owif-app.js?${version}"`));
 	assert.ok(editor.includes(`/modern/js/bouqueteditor-app.js?${version}"`));
 	assert.ok(autoTimer.includes(`/modern/js/autotimers-app.js?${version}"`));

@@ -104,6 +104,10 @@ const config = {
 };
 
 module.exports = (env, argv) => {
+  if (env && env.target) {
+    if (!config.entry[env.target]) throw new Error(`Unknown entry: ${env.target}`);
+    throw new Error('Build all modern entries together: a targeted build replaces the shared vendors-app.js with an incompatible bundle.');
+  }
   if (argv.mode === 'development') {
     config.output.filename = '[name]-app.js';
     config.output.clean = false;

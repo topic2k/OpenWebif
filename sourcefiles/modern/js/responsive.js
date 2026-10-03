@@ -2,6 +2,7 @@ var standby_status = -1;
 var timerFormInitiated = - 1;
 var timerTagChoices = null;
 var timerTagOptions = [];
+			const response = await fetch(owifRequestUrl('/api/tagfiltertags'));
 
 
 $(function () {

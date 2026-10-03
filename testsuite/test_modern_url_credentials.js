@@ -8,6 +8,8 @@ const root = join(__dirname, '..');
 const template = readFileSync(join(root, 'plugin/controllers/views/responsive/main.tmpl'), 'utf8');
 const owif = readFileSync(join(root, 'sourcefiles/modern/js/owif.js'), 'utf8');
 const bouquetEditor = readFileSync(join(root, 'sourcefiles/modern/js/bqe.mjs'), 'utf8');
+const responsive = readFileSync(join(root, 'sourcefiles/modern/js/responsive.js'), 'utf8');
+const bundledResponsive = readFileSync(join(root, 'plugin/public/modern/js/responsive.min.js'), 'utf8');
 
 function browserContext(address) {
 	const location = new URL(address);
@@ -63,7 +65,53 @@ for (const address of ['http://alice:secret@receiver.local/#at', 'http://receive
 			'http://receiver.local/api/tagfiltertags'
 		]);
 	});
+
+	test(`Filter zeigt bekannte Stichworte mit ${address.includes('@') ? 'und' : 'ohne'} URL-Zugangsdaten`, async () => {
+		const {context, requests} = browserContext(address);
+		installUrlNormalization(context);
+		const makeNode = () => ({
+			children: [],
+			replaceChildren() { this.children = []; },
+			appendChild(child) { this.children.push(child); },
+			append(...children) { this.children.push(...children); },
+			prepend(child) { this.children.unshift(child); }
+		});
+		const panel = {hidden: true};
+		const options = makeNode();
+		const toggle = {classList: {toggle() {}}, querySelector: () => null, setAttribute() {}};
+		const nodes = {
+			'.list-tag-filter-panel': panel,
+			'.list-tag-filter-options': options,
+			'.list-tag-filter-selection': {hidden: true},
+			'.list-tag-filter-chips': makeNode(),
+			'.list-tag-filter-count': {textContent: ''},
+			'.list-tag-filter-clear': {}
+		};
+		const host = {
+			isConnected: true,
+			dataset: {known: 'Bekannte Stichworte', used: 'Weitere verwendete Stichworte', matches: '%d', error: 'Abruf fehlgeschlagen'},
+			parentElement: {querySelectorAll: () => []},
+			querySelector: selector => nodes[selector]
+		};
+		Object.assign(context.document, {
+			getElementById: () => host,
+			querySelector: () => toggle,
+			addEventListener() {},
+			createElement: () => makeNode(),
+			createTextNode: text => ({textContent: text})
+		});
+		runInNewContext(responsive.slice(responsive.indexOf('var listTagFilterSelections'), responsive.indexOf('$(function ()')), context);
+		context.initListTagFilter('at');
+		await toggle.onclick();
+		assert.deepEqual(requests, ['http://receiver.local/api/tagfiltertags']);
+		assert.equal(options.children[0].textContent, 'Bekannte Stichworte');
+		assert.equal(options.children[1].children[0].value, 'Serie');
+	});
 }
+
+test('ausgeliefertes Filterskript bereinigt die URL des Stichwortabrufs', () => {
+	assert.match(bundledResponsive, /fetch\(owifRequestUrl\(["']\/api\/tagfiltertags["']\)\)/);
+});
 
 test('Bouqueteditor sendet Lese- und Schreibaufrufe ohne URL-Zugangsdaten', async () => {
 	const {context, requests} = browserContext('http://alice:secret@receiver.local/#bqe');
