@@ -38,7 +38,7 @@ class EpgDateRangeTests(unittest.TestCase):
     def test_date_row_has_equal_spacing_above_and_below(self):
         template = TEMPLATE.read_text(encoding='utf-8')
         self.assertIn('#navepg > .nav-tabs { margin-bottom: 0; }', template)
-        self.assertIn('#epg-date-range { clear: both; font-size: 20px; line-height: 1.4; margin: 12px 4px; }', template)
+        self.assertIn('#epg-date-range { clear: both; font-size: 18px; line-height: 1.4; margin: 12px 4px; }', template)
         self.assertNotIn('<br clear="all">', template)
         self.assertNotIn('id="bqlist" class="nav nav-tabs tab--skinned" style="margin-top: -10px;', template)
 
