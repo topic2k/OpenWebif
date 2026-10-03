@@ -6,6 +6,7 @@ import hashlib
 import http.client
 import json
 import os
+import re
 import time
 import urllib.request
 from pathlib import Path
@@ -76,6 +77,10 @@ def install(receiver, package):
 
 def restart(receiver):
     no_recording(receiver)
+    template = (ROOT / 'plugin/controllers/views/responsive/ajax/at.tmpl').read_bytes()
+    marker = re.search(rb'autotimers-app\.js\?v[\d.]+', template)
+    if marker is None:
+        raise RuntimeError('AutoTimer-Browserdatei ohne Versionskennung')
     try:
         result = request(receiver, "/api/powerstate?newstate=3")
         if not result.get("result"):
@@ -89,8 +94,8 @@ def restart(receiver):
         try:
             time.sleep(3)
             content = request_bytes(receiver, "/ajax/at")
-            if b"autotimers-app.js?v1.2.34" in content:
-                print("Enigma2-Neustart bestätigt: aktives AutoTimer-Template enthält v1.2.34")
+            if marker.group() in content:
+                print('Enigma2-Neustart bestätigt: aktives AutoTimer-Template enthält', marker.group().decode())
                 return
         except Exception:
             pass

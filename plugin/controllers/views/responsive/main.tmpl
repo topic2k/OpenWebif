@@ -55,6 +55,28 @@
 	<link rel="stylesheet" type="text/css" href="/modern/css/bootstrap-chosen.min.css">
 	<link rel="stylesheet" type="text/css" href="/modern/css/timepicker.min.css">
 	<link rel="stylesheet" type="text/css" href="/modern/css/responsive.min.css">
+	<style>
+		.card .header .list-tag-filter-toolbar { display: flex; align-items: center; gap: 6px; }
+		.card .header .list-tag-filter-toolbar > li { display: flex; align-items: center; }
+		.list-tag-filter-toggle { border: 0; background: transparent; cursor: pointer; color: #999; padding: 0; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; }
+		.list-tag-filter-toggle svg { width: 28px; height: 28px; fill: currentColor; }
+		.list-tag-filter-toggle svg[hidden] { display: none; }
+		.list-tag-filter-toggle:hover { color: #000; }
+		.card .header .list-tag-filter-toggle.list-tag-filter-active { color: #1e88e5; }
+		.list-tag-filter { position: relative; }
+		.list-tag-filter-panel { position: absolute; top: 0; right: 0; z-index: 30; width: min(360px, 100%); max-height: 55vh; overflow-y: auto; padding: 14px; background: #fff; color: #333; box-shadow: 0 3px 12px #999; border: 1px solid #ddd; }
+		.list-tag-filter-options strong, .list-tag-filter-options label { display: block; padding: 5px 0; }
+		.list-tag-filter-options strong { font-weight: 700; }
+		.list-tag-filter-options label { font-weight: normal; }
+		.list-tag-filter-options strong:not(:first-child) { border-top: 1px solid #ddd; margin-top: 8px; }
+		.list-tag-filter-options label { cursor: pointer; }
+		.list-tag-filter-selection { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
+		.list-tag-filter-chip, .list-tag-item-badge { display: inline-block; border: 1px solid #ccc; border-radius: 15px; background: #f2f2f2; color: var(--skin-color, #666); font-size: 12px; padding: 2px 8px; margin: 3px; }
+		.skin--white .list-tag-filter-chip, .skin--white .list-tag-item-badge { color: #333; }
+		.list-tag-filter-chip { cursor: pointer; padding: 1px 8px; }
+		.list-tag-item-tags { margin-top: 6px; }
+		.list-tag-filter [hidden], .list-tag-filter-item[hidden] { display: none !important; }
+	</style>
 	#if $USERCSSMODERN != ''
 	<link rel="stylesheet" type="text/css" href="$USERCSSMODERN">
 	#end if
@@ -954,12 +976,12 @@
 ##   .filter((tag) => tag.tagName === 'script')
 ##   .join('')
 ## %>
-<script src="/modern/js/vendors-app.js?v=wp"></script><script src="/modern/js/owif-app.js?v1.2.41"></script>
+<script src="/modern/js/vendors-app.js?v1.2.43"></script><script src="/modern/js/owif-app.js?v1.2.43"></script>
 
 <script src="/modern/js/bootstrap-date-timepicker.min.js"></script>
 <script src="/modern/js/admin.min.js?v=wp"></script>
 <script src="/modern/plugins/choices/choices.min.js"></script>
-<script src="/modern/js/responsive.min.js?v1.2.36"></script>
+<script src="/modern/js/responsive.min.js?v1.2.43"></script>
 <script>initJsTranslationAddon($dumps($tstrings))</script>
 
 <script>

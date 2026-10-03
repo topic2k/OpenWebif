@@ -1,5 +1,6 @@
 #from urllib.parse import quote
 #from time import localtime, strftime
+#from html import escape
 #from Plugins.Extensions.OpenWebif.controllers.i18n import tstrings
 #from Plugins.Extensions.OpenWebif.controllers.defaults import isSettingEnabled
 
@@ -11,10 +12,10 @@
 					<h2><i class="material-icons material-icons-centered">movie</i>$tstrings['movies']</h2>
 				</div>
 			</div>
-			<ul class="header-dropdown">
-				<li>
+			<ul class="header-dropdown list-tag-filter-toolbar">
+				<li><button type="button" class="list-tag-filter-toggle" data-tag-filter-toggle="movies" title="$tstrings['tag_filter_title']" aria-label="$tstrings['tag_filter_title']" aria-expanded="false"><svg class="list-tag-filter-icon--off" data-icon="ic:round-filter-alt-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.79 5.61A.998.998 0 0 0 19 4H6.83l7.97 7.97zm.7 14.88L3.51 3.51A.996.996 0 1 0 2.1 4.92L10 13v5c0 1.1.9 2 2 2s2-.9 2-2v-1.17l5.07 5.07c.39.39 1.02.39 1.41 0s.4-1.02.01-1.41"/></svg><svg class="list-tag-filter-icon--on" data-icon="ic:round-filter-alt" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M4.25 5.61C6.57 8.59 10 13 10 13v5c0 1.1.9 2 2 2s2-.9 2-2v-5s3.43-4.41 5.75-7.39c.51-.66.04-1.61-.8-1.61H5.04c-.83 0-1.3.95-.79 1.61"/></svg></button></li>
+				<li><a href="#movies"><i class="material-icons">autorenew</i></a></li>
 				<li class="dropdown">
-				<a href="#movies"><i class="material-icons">autorenew</i></a>
 				<a href="javascript:void(0);" class="dropdown-toggle m-l-5 m-r-5" title="$tstrings['sort']" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false"><i class="material-icons">sort</i></a>
 					<ul class="dropdown-menu pull-right" id="timerbuttons">
 						<li><a href="javascript:void(0);" onclick="changeMoviesort('name'); return false;"><i class="material-icons material-icons-centered">vertical_align_bottom</i>$tstrings['name_asc']</a></li>
@@ -26,6 +27,10 @@
 			</ul>
 		</div>
 		<div class="body">
+			<div id="tag-filter-movies" class="list-tag-filter" data-list="movies" data-known="$tstrings['known_tags']" data-used="$tstrings['tag_filter_used']" data-clear="$tstrings['tag_filter_clear']" data-matches="$tstrings['tag_filter_matches']" data-error="$tstrings['tag_filter_error']">
+				<div class="list-tag-filter-panel" hidden><div class="list-tag-filter-options"></div></div>
+				<div class="list-tag-filter-selection" hidden><span class="list-tag-filter-chips"></span><button type="button" class="btn btn-default list-tag-filter-clear">$tstrings['tag_filter_clear']</button><span class="list-tag-filter-count"></span></div>
+			</div>
 			<div id="content_main">
 				<div id="tvcontentmain">
 					<div class="row clearfix m-l-20 m-b-20">
@@ -70,7 +75,7 @@
 					#set $count = 0
 					#for $movie in $movies
 					#set $mname = $movie.eventname.replace("\"", r"'")
-					<div class="row clearfix">
+					<div class="row clearfix list-tag-filter-item" data-filter-tags="$escape($movie.tags or '', quote=True)">
 						<div class="col-xs-12" id="movies">
 								<div class="card" id="$count">
 									<div class="header">
@@ -116,9 +121,10 @@
 											</div>
 									</div>
 									<div class="body">
-										<div class="row clearfix" style="margin-bottom:-25px;">
-											<div class="col-xs-12">
-												<span data-toggle="collapse" data-target="#eventid$count" aria-expanded="false"aria-controls="collapseExample" style="cursor:pointer;"><b>$movie.description</b><i class="material-icons material-icons-centered">expand_more</i></span>
+											<div class="row clearfix" style="margin-bottom:-25px;">
+												<div class="col-xs-12">
+													<span data-toggle="collapse" data-target="#eventid$count" aria-expanded="false"aria-controls="collapseExample" style="cursor:pointer;"><b>$movie.description</b><i class="material-icons material-icons-centered">expand_more</i></span>
+													<div class="list-tag-item-tags"></div>
 												<div class="collapse" id="eventid$count">
 													<p>$movie.descriptionExtended</p>
 												</div>
@@ -139,6 +145,7 @@
 <script>
 	jQuery(function() {
 		MLHelper.Load('name');
+		initListTagFilter('movies');
 	});
 
 #if $len($bookmarks)

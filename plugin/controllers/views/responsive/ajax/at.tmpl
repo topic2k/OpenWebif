@@ -144,7 +144,7 @@
 </style>
 
 <template id="autotimer-list-item-template">
-	<li class="card at__item row-striped">
+	<li class="card at__item row-striped list-tag-filter-item">
 		<div class="header">
 			<div class="row clearfix m-b--20">
 				<div class="col-xs-4">
@@ -183,6 +183,7 @@
 				<div class="col-sm-8">
 					<slot name="autotimer-searchType"></slot>
 					<slot name="autotimer-match"></slot>
+					<div class="list-tag-item-tags"></div>
 				</div>
 			</div>
 		</div>
@@ -238,7 +239,8 @@
 					</h2>
 				</div>
 			</div>
-			<ul class="header-dropdown m-r-5">
+			<ul class="header-dropdown list-tag-filter-toolbar m-r-5">
+				<li><button type="button" class="list-tag-filter-toggle" data-tag-filter-toggle="at" title="$tstrings['tag_filter_title']" aria-label="$tstrings['tag_filter_title']" aria-expanded="false"><svg class="list-tag-filter-icon--off" data-icon="ic:round-filter-alt-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.79 5.61A.998.998 0 0 0 19 4H6.83l7.97 7.97zm.7 14.88L3.51 3.51A.996.996 0 1 0 2.1 4.92L10 13v5c0 1.1.9 2 2 2s2-.9 2-2v-1.17l5.07 5.07c.39.39 1.02.39 1.41 0s.4-1.02.01-1.41"/></svg><svg class="list-tag-filter-icon--on" data-icon="ic:round-filter-alt" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M4.25 5.61C6.57 8.59 10 13 10 13v5c0 1.1.9 2 2 2s2-.9 2-2v-5s3.43-4.41 5.75-7.39c.51-.66.04-1.61-.8-1.61H5.04c-.83 0-1.3.95-.79 1.61"/></svg></button></li>
 				<li>
 					<a href="javascript:void(0);" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false"><i class="material-icons">more_vert</i></a>
 					<ul class="dropdown-menu pull-right" id="atbuttons">
@@ -251,6 +253,10 @@
 			<div id="content_main">
 
 				<div id="at__page--list">
+					<div id="tag-filter-at" class="list-tag-filter" data-list="at" data-known="$tstrings['known_tags']" data-used="$tstrings['tag_filter_used']" data-clear="$tstrings['tag_filter_clear']" data-matches="$tstrings['tag_filter_matches']" data-error="$tstrings['tag_filter_error']">
+						<div class="list-tag-filter-panel" hidden><div class="list-tag-filter-options"></div></div>
+						<div class="list-tag-filter-selection" hidden><span class="list-tag-filter-chips"></span><button type="button" class="btn btn-default list-tag-filter-clear">$tstrings['tag_filter_clear']</button><span class="list-tag-filter-count"></span></div>
+					</div>
 					<div class="row align-center clearfix">
 						<a href="/#/at/new" class="btn btn--skinned waves-effect"><i class="material-icons">add</i><span>$tstrings['at_new']</span></a>
 						<button type="button" name="reload" class="btn btn--skinned waves-effect"><i class="material-icons">refresh</i><span>$tstrings['reload']</span></button>
@@ -856,6 +862,6 @@
 ##   .filter((tag) => tag.tagName === 'script')
 ##   .join('') 
 ## %>
-<script src="/modern/js/autotimers-app.js?v1.2.36"></script>
+<script src="/modern/js/autotimers-app.js?v1.2.43"></script>
 
 #end filter

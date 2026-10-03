@@ -33,7 +33,7 @@ from .models.locations import getLocations, getCurrentLocation, addLocation, rem
 from .models.timers import getTimers, addTimer, addTimerByEventId, editTimer, removeTimer, toggleTimerStatus, cleanupTimer, writeTimerList, recordNow, tvbrowser, getSleepTimer, setSleepTimer, getPowerTimer, setPowerTimer, getVPSChannels
 from .models.message import sendMessage, getMessageAnswer
 from .models.movies import getMovieList, removeMovie, getMovieInfo, movieAction, getAllMovies, getMovieDetails, setMovieResumePoint, MOVIETAGFILE
-from .models.tagmanager import update_known_tags, rename_tag_and_uses, delete_tag_and_uses, get_tag_usage_for_session, format_tag
+from .models.tagmanager import update_known_tags, rename_tag_and_uses, delete_tag_and_uses, get_tag_usage_for_session, get_filter_tags, format_tag
 from .models.config import cancelConfigBatch, getSettings, addCollapsedMenu, removeCollapsedMenu, saveConfig, saveConfigBatch, getConfigs, getConfigsSections
 from .models.stream import getStream, getTS, getStreamSubservices, GetSession
 from .models.servicelist import reloadServicesLists
@@ -1065,6 +1065,9 @@ class WebController(BaseController):
 			HTTP response with headers
 		"""
 		return getMovieInfo()
+
+	def P_tagfiltertags(self, request):
+		return get_filter_tags(self.session, comp_config.movielist.videodirs.value[:] or None)
 
 	def P_tagmanager(self, request):
 		if request.method != b'POST':

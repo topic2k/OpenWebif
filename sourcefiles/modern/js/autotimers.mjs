@@ -261,7 +261,7 @@
 
       // fallback to (incorrectly) space-separated values
       if (self['e2tags']) {
-        if (!self['tag']) {
+        if (!self['tag'].length) {
           self['tag'] = self['e2tags'].split(' ');
         }
         delete self['e2tags'];
@@ -325,6 +325,15 @@
 
     const atEditForm = document.querySelector('form[name="atedit"]');
     const atSettingsForm = document.querySelector('form[name="atsettings"]');
+
+    const updateListTagFilter = () => {
+      if (typeof window.initListTagFilter !== 'function') return;
+      try {
+        window.initListTagFilter('at');
+      } catch (error) {
+        window.console?.warn('AutoTimer tag filter could not be initialized:', error);
+      }
+    };
 
     const addDependentSectionTogglers = (data = {}) => {
       // set up show/hide checkboxes
@@ -398,6 +407,7 @@
 
             const searchType = valueLabelMap.autoTimers.searchType[atItem['searchType']] || '';
             const newNode = templateEl.content.firstElementChild.cloneNode(true);
+            newNode.dataset.filterTags = atItem.tag.join(' ');
 
             newNode.querySelector('[name="preview"]').onclick = (evt) => self.preview(atItem.id);
             newNode.querySelector('[name="rename"]').onclick = (evt) => self.renameEntry(atItem.id, atItem.name);
@@ -440,6 +450,7 @@
           // https://dev.to/clairecodes/how-to-create-an-array-of-unique-values-in-javascript-using-sets-5dg6
           self.allLocations = [...new Set(self.availableLocations.concat(collatedLocations))].sort() || [];
           self.allTags = [...new Set(self.availableTags.concat(collatedTags))].sort() || [];
+          updateListTagFilter();
         });
       },
 
@@ -556,10 +567,7 @@
 
       prepareChoices: () => {
         self.allTags = self.allTags.map((tag) => {
-          return {
-            value: tag,
-            label: tag,
-          };
+          return typeof tag === 'string' ? { value: tag, label: tag } : tag;
         });
 
         self.autoTimerChoices['tag'].setChoices(self.allTags, 'value', 'label', true);
@@ -1002,9 +1010,10 @@
         self.availableServices = await owif.api.getAllServices(excludeIptv, CutTitle);
         self.availableLocations = []; // these are already server-rendered
         self.allLocations = [];
-        self.availableTags = await owif.api.getTags();
-        self.allTags = [];
+        self.availableTags = await owif.api.getTags().catch(() => []);
+        self.allTags = self.availableTags.slice();
         self.autoTimerChoices = owif.gui.preparedChoices();
+        updateListTagFilter();
 
         const hash = window.location.hash;
         if (hash.split('?')[0] === '#/at/new') {

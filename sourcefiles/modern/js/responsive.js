@@ -2,7 +2,135 @@ var standby_status = -1;
 var timerFormInitiated = - 1;
 var timerTagChoices = null;
 var timerTagOptions = [];
+var listTagFilterSelections = {movies: [], timers: [], at: []};
+var listTagFilterOutsideClickReady = false;
+
+function tagFilterMatches(tags, selected) {
+	return !selected.length || selected.some(tag => tags.includes(tag));
+}
+
+function closeListTagFilterOnOutsideClick(event) {
+	document.querySelectorAll('.list-tag-filter-panel:not([hidden])').forEach(panel => {
+		const host = panel.closest('.list-tag-filter');
+		const toggle = document.querySelector('[data-tag-filter-toggle="' + host.dataset.list + '"]');
+		if (!panel.contains(event.target) && (!toggle || !toggle.contains(event.target))) {
+			panel.hidden = true;
+			if (toggle) toggle.setAttribute('aria-expanded', 'false');
+		}
+	});
+}
+
+function initListTagFilter(kind) {
+	const host = document.getElementById('tag-filter-' + kind);
+	if (!host) return;
+	if (!listTagFilterOutsideClickReady) {
+		document.addEventListener('click', closeListTagFilterOnOutsideClick);
+		listTagFilterOutsideClickReady = true;
+	}
+	const toggle = document.querySelector('[data-tag-filter-toggle="' + kind + '"]');
+	const panel = host.querySelector('.list-tag-filter-panel');
+	const options = host.querySelector('.list-tag-filter-options');
+	const selection = host.querySelector('.list-tag-filter-selection');
+	const chips = host.querySelector('.list-tag-filter-chips');
+	const count = host.querySelector('.list-tag-filter-count');
+	const selected = listTagFilterSelections[kind];
+	let known = [];
+	let used = [];
+
+	function itemTags(item) {
+		return (item.dataset.filterTags || '').split(/\s+/).filter(Boolean);
+	}
+
+	function render() {
+		let matches = 0;
+		host.parentElement.querySelectorAll('.list-tag-filter-item').forEach(item => {
+			const tags = itemTags(item);
+			item.hidden = !tagFilterMatches(tags, selected);
+			if (!item.hidden) matches++;
+			const labels = item.querySelector('.list-tag-item-tags');
+			if (labels) {
+				labels.replaceChildren();
+				tags.forEach(tag => {
+					const badge = document.createElement('span');
+					badge.className = 'list-tag-item-badge';
+					badge.textContent = tag.replace(/_/g, ' ');
+					labels.appendChild(badge);
+				});
+			}
+		});
+		chips.replaceChildren();
+		selected.forEach(tag => {
+			const chip = document.createElement('button');
+			chip.type = 'button';
+			chip.className = 'list-tag-filter-chip';
+			chip.textContent = tag.replace(/_/g, ' ') + ' ×';
+			chip.onclick = () => {
+				selected.splice(selected.indexOf(tag), 1);
+				render();
+				renderOptions();
+			};
+			chips.appendChild(chip);
+		});
+		selection.hidden = !selected.length;
+		count.textContent = host.dataset.matches.replace('%d', matches);
+		toggle.classList.toggle('list-tag-filter-active', !!selected.length);
+		toggle.querySelector('.list-tag-filter-icon--off')?.toggleAttribute('hidden', !!selected.length);
+		toggle.querySelector('.list-tag-filter-icon--on')?.toggleAttribute('hidden', !selected.length);
+	}
+
+	function renderOptions() {
+		options.replaceChildren();
+		const localTags = [...new Set(Array.from(host.parentElement.querySelectorAll('.list-tag-filter-item')).flatMap(itemTags))];
+		const groups = [[host.dataset.known, known], [host.dataset.used, [...new Set(used.concat(localTags, selected))].filter(tag => !known.includes(tag)).sort()]];
+		groups.forEach(([title, tags]) => {
+			if (!tags.length) return;
+			const heading = document.createElement('strong');
+			heading.textContent = title;
+			options.appendChild(heading);
+			tags.forEach(tag => {
+				const label = document.createElement('label');
+				const checkbox = document.createElement('input');
+				checkbox.type = 'checkbox';
+				checkbox.value = tag;
+				checkbox.checked = selected.includes(tag);
+				checkbox.onchange = () => {
+					const index = selected.indexOf(tag);
+					if (checkbox.checked && index === -1) selected.push(tag);
+					if (!checkbox.checked && index !== -1) selected.splice(index, 1);
+					render();
+				};
+				label.append(checkbox, document.createTextNode(' ' + tag.replace(/_/g, ' ')));
+				options.appendChild(label);
+			});
+		});
+	}
+
+	toggle.onclick = async () => {
+		panel.hidden = !panel.hidden;
+		toggle.setAttribute('aria-expanded', String(!panel.hidden));
+		if (panel.hidden) return;
+		renderOptions();
+		try {
 			const response = await fetch(owifRequestUrl('/api/tagfiltertags'));
+			if (!response.ok) throw new Error(response.status);
+			const tags = await response.json();
+			if (!host.isConnected || panel.hidden) return;
+			known = tags.known || [];
+			used = tags.used || [];
+			renderOptions();
+		} catch (error) {
+			const message = document.createElement('p');
+			message.textContent = host.dataset.error;
+			options.prepend(message);
+		}
+	};
+	host.querySelector('.list-tag-filter-clear').onclick = () => {
+		selected.length = 0;
+		render();
+		renderOptions();
+	};
+	render();
+}
 
 
 $(function () {

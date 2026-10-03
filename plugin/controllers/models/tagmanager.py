@@ -249,3 +249,28 @@ def get_tag_usage_for_session(tags, session, locations):
 	from .timers import getTimers
 	movies = _get_recordings(locations)
 	return get_tag_usage(tags, getTimers(session)['timers'], movies)
+
+
+def get_filter_tags(session, locations, autotimer_file=AUTOTIMERFILE):
+	known = get_known_tags()
+	used = set()
+	for location in locations or [None]:
+		try:
+			for movie in _get_recordings([location] if location is not None else None):
+				used.update((movie.get('tags') or '').split())
+		except Exception as err:
+			print(f'[OpenWebif] Unable to read recording tags from {location}: {err}')
+	for timer in session.nav.RecordTimer.timer_list + session.nav.RecordTimer.processed_timers:
+		used.update(timer.tags or [])
+	if exists(autotimer_file):
+		try:
+			for timer in ElementTree.parse(autotimer_file).getroot().iter('timer'):
+				used.update((timer.get('tags') or '').split())
+				for element in timer.iter('tag'):
+					if element.text:
+						used.add(element.text)
+				for element in timer.iter('tags'):
+					used.update((element.text or '').split())
+		except (OSError, ElementTree.ParseError) as err:
+			print(f'[OpenWebif] Unable to read AutoTimer tags: {err}')
+	return {'known': known, 'used': sorted(used - set(known))}

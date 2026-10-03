@@ -2,12 +2,12 @@ import os
 import tempfile
 from pathlib import Path
 from sys import modules
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 import unittest
 from unittest.mock import patch
 from xml.etree import ElementTree
 
-from plugin.controllers.models.tagmanager import get_known_tags, update_known_tags, get_tag_usage, get_tag_usage_for_session
+from plugin.controllers.models.tagmanager import get_known_tags, update_known_tags, get_tag_usage, get_tag_usage_for_session, get_filter_tags
 
 
 class TagManagerTests(unittest.TestCase):
@@ -106,6 +106,73 @@ class TagManagerTests(unittest.TestCase):
             self.assertEqual(get_tag_usage_for_session(['Alt_Neu'], session, ['/movie']),
                              {'Alt_Neu': {'timers': 1, 'movies': 1, 'autotimers': 0}})
         self.assertEqual(calls, [({b'fields': [b'tags'], b'recursive': [b'1'], b'dirname': [b'/movie']}, '/movie')])
+
+    def test_filter_options_include_known_and_unmanaged_used_tags(self):
+        xml = Path(self.tmp.name) / 'autotimer.xml'
+        xml.write_text('<autotimer><timer tags="Archiv Doku"><tag>Auto</tag>'
+                       '<tags>Extra Doku</tags></timer></autotimer>', encoding='utf-8')
+        session = SimpleNamespace(nav=SimpleNamespace(RecordTimer=SimpleNamespace(
+            timer_list=[SimpleNamespace(tags=['Krimi', 'Timer'])],
+            processed_timers=[SimpleNamespace(tags=['Archiv'])])))
+        with patch('plugin.controllers.models.tagmanager.get_known_tags', return_value=['Krimi', 'Doku']), \
+             patch('plugin.controllers.models.tagmanager._get_recordings', return_value=[
+                 {'tags': 'Doku Aufnahme'}, {'tags': 'Aufnahme'}]) as recordings:
+            self.assertEqual(get_filter_tags(session, ['/movies'], xml), {
+                'known': ['Krimi', 'Doku'],
+                'used': ['Archiv', 'Aufnahme', 'Auto', 'Extra', 'Timer']})
+        recordings.assert_called_once_with(['/movies'])
+
+    def test_filter_options_work_without_autotimer_file(self):
+        session = SimpleNamespace(nav=SimpleNamespace(RecordTimer=SimpleNamespace(
+            timer_list=[], processed_timers=[])))
+        with patch('plugin.controllers.models.tagmanager.get_known_tags', return_value=['Doku']), \
+             patch('plugin.controllers.models.tagmanager._get_recordings', return_value=[]):
+            self.assertEqual(get_filter_tags(session, None, Path(self.tmp.name) / 'missing.xml'),
+                             {'known': ['Doku'], 'used': []})
+
+    def test_filter_options_keep_managed_tags_when_recordings_cannot_be_read(self):
+        self.filename.write_text('Meine Filme\nDoku\n', encoding='utf-8')
+        session = SimpleNamespace(nav=SimpleNamespace(RecordTimer=SimpleNamespace(
+            timer_list=[SimpleNamespace(tags=['Timer', 'Doku'])], processed_timers=[])))
+        with patch('plugin.controllers.models.tagmanager.get_known_tags',
+                   side_effect=lambda: get_known_tags(self.filename)), \
+             patch('plugin.controllers.models.tagmanager._get_recordings',
+                   side_effect=OSError('Recording directory unavailable')):
+            self.assertEqual(get_filter_tags(session, ['/offline'], Path(self.tmp.name) / 'missing.xml'),
+                             {'known': ['Meine_Filme', 'Doku'], 'used': ['Timer']})
+
+    def test_filter_options_keep_used_tags_from_accessible_sources(self):
+        self.filename.write_text('Doku\n', encoding='utf-8')
+        xml = Path(self.tmp.name) / 'autotimer.xml'
+        xml.write_text('<autotimer><timer><tag>Auto</tag></timer></autotimer>', encoding='utf-8')
+        session = SimpleNamespace(nav=SimpleNamespace(RecordTimer=SimpleNamespace(
+            timer_list=[SimpleNamespace(tags=['Timer'])], processed_timers=[])))
+
+        def recordings(locations):
+            if locations != ['/online']:
+                raise OSError('Recording directory unavailable')
+            return [{'tags': 'Doku Aufnahme'}]
+
+        with patch('plugin.controllers.models.tagmanager.get_known_tags',
+                   side_effect=lambda: get_known_tags(self.filename)), \
+             patch('plugin.controllers.models.tagmanager._get_recordings', side_effect=recordings) as scan:
+            self.assertEqual(get_filter_tags(session, ['/offline', '/online'], xml),
+                             {'known': ['Doku'], 'used': ['Aufnahme', 'Auto', 'Timer']})
+        self.assertEqual([call.args[0] for call in scan.call_args_list],
+                         [['/offline'], ['/online']])
+
+    def test_filter_options_keep_other_sources_when_autotimer_is_corrupt(self):
+        self.filename.write_text('Doku\n', encoding='utf-8')
+        xml = Path(self.tmp.name) / 'autotimer.xml'
+        xml.write_text('<autotimer><timer>', encoding='utf-8')
+        session = SimpleNamespace(nav=SimpleNamespace(RecordTimer=SimpleNamespace(
+            timer_list=[SimpleNamespace(tags=['Timer'])], processed_timers=[])))
+        with patch('plugin.controllers.models.tagmanager.get_known_tags',
+                   side_effect=lambda: get_known_tags(self.filename)), \
+             patch('plugin.controllers.models.tagmanager._get_recordings',
+                   return_value=[{'tags': 'Doku Aufnahme'}]):
+            self.assertEqual(get_filter_tags(session, ['/online'], xml),
+                             {'known': ['Doku'], 'used': ['Aufnahme', 'Timer']})
 
     def test_usage_counts_exact_tags_in_timers_movies_and_autotimers(self):
         xml = Path(self.tmp.name) / 'autotimer.xml'

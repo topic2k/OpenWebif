@@ -1779,7 +1779,7 @@ msgstr "Beschreibung muss eindeutig sein"
 
 #: ../plugin/controllers/i18n.py:567
 msgid "Reset"
-msgstr "Zurücksetzten"
+msgstr "Zurücksetzen"
 
 #: ../plugin/controllers/i18n.py:357
 msgid "Reset count"
@@ -2952,6 +2952,26 @@ msgstr "Stichworte verwalten"
 #: ../plugin/controllers/i18n.py
 msgid "Known tags"
 msgstr "Bekannte Stichworte"
+
+#: ../plugin/controllers/i18n.py
+msgid "Choose tags"
+msgstr "Stichworte wählen"
+
+#: ../plugin/controllers/i18n.py
+msgid "Filter by tags"
+msgstr "Nach Stichworten filtern"
+
+#: ../plugin/controllers/i18n.py
+msgid "Other tags in use"
+msgstr "Weitere verwendete Stichworte"
+
+#: ../plugin/controllers/i18n.py
+msgid "%d matches"
+msgstr "%d Treffer"
+
+#: ../plugin/controllers/i18n.py
+msgid "Could not load tags"
+msgstr "Stichworte konnten nicht geladen werden"
 
 #: ../plugin/controllers/i18n.py
 msgid "Usage"

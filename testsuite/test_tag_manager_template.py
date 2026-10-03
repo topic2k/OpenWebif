@@ -2,6 +2,7 @@ from collections import defaultdict
 from html.parser import HTMLParser
 from pathlib import Path
 from types import ModuleType
+import time
 import unittest
 from unittest.mock import patch
 
@@ -35,7 +36,74 @@ class TagTableParser(HTMLParser):
             self.labels[-1] += data
 
 
+class FilterItemParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.items = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if 'data-filter-tags' in attrs:
+            self.items.append(attrs)
+
+
 class TagManagerTemplateTests(unittest.TestCase):
+    def test_modern_tag_filter_templates_compile(self):
+        folder = Path(__file__).resolve().parents[1] / 'plugin/controllers/views/responsive/ajax'
+        translations = ModuleType('Plugins.Extensions.OpenWebif.controllers.i18n')
+        translations.tstrings = defaultdict(str)
+        defaults = ModuleType('Plugins.Extensions.OpenWebif.controllers.defaults')
+        defaults.isSettingEnabled = lambda name: ''
+        with patch.dict('sys.modules', {translations.__name__: translations, defaults.__name__: defaults}):
+            for name in ('movies', 'timers', 'at'):
+                with self.subTest(name=name):
+                    Template.compile(source=(folder / (name + '.tmpl')).read_text(encoding='utf-8'))
+
+    def test_timer_filter_tag_attribute_preserves_special_characters(self):
+        folder = Path(__file__).resolve().parents[1] / 'plugin/controllers/views/responsive/ajax'
+        translations = ModuleType('Plugins.Extensions.OpenWebif.controllers.i18n')
+        translations.tstrings = defaultdict(str)
+        defaults = ModuleType('Plugins.Extensions.OpenWebif.controllers.defaults')
+        defaults.isSettingEnabled = lambda name: ''
+        timer = {'serviceref': '1:0:1', 'name': 'Film', 'tags': 'Krimi,_Drama A_"B"_<script>&',
+                 'begin': 1, 'end': 2, 'disabled': False, 'state': 0, 'justplay': 0,
+                 'servicename': 'Sender', 'realbegin': 'Heute', 'realend': 'Morgen',
+                 'duration': 60, 'repeated': 0, 'description': 'Beschreibung'}
+        with patch.dict('sys.modules', {translations.__name__: translations, defaults.__name__: defaults}):
+            for compact in (False, True):
+                with self.subTest(compact=compact):
+                    defaults.isSettingEnabled = lambda name: 'checked' if compact else ''
+                    rendered = str(Template(file=str(folder / 'timers.tmpl'),
+                                            searchList=[{'timers': [timer], 'compacttimerlist': compact,
+                                                         'time': time}]))
+                    parser = FilterItemParser()
+                    parser.feed(rendered)
+                    self.assertEqual(len(parser.items), 1)
+                    self.assertEqual(parser.items[0]['data-filter-tags'], timer['tags'])
+                    self.assertNotIn('data-filter-tags="Krimi,_Drama A_"B"_', rendered)
+
+    def test_movie_filter_tag_attribute_preserves_special_characters(self):
+        folder = Path(__file__).resolve().parents[1] / 'plugin/controllers/views/responsive/ajax'
+        translations = ModuleType('Plugins.Extensions.OpenWebif.controllers.i18n')
+        translations.tstrings = defaultdict(str)
+        defaults = ModuleType('Plugins.Extensions.OpenWebif.controllers.defaults')
+        defaults.isSettingEnabled = lambda name: ''
+        movie = {'eventname': 'Film', 'tags': 'Krimi,_Drama A_"B"_<script>&',
+                 'servicename': 'Sender', 'serviceref': '1:0:1', 'filename': '/movie/a.ts',
+                 'recordingtime': 1000, 'lastseen': 0, 'length': '1:00',
+                 'filesize_readable': '1 GB', 'description': 'Beschreibung', 'descriptionExtended': ''}
+        with patch.dict('sys.modules', {translations.__name__: translations, defaults.__name__: defaults}), \
+             patch('builtins._', lambda text: text, create=True):
+            rendered = str(Template(file=str(folder / 'movies.tmpl'),
+                                    searchList=[{'movies': [movie], 'directory': '/movie/',
+                                                 'bookmarks': [], 'transcoding': False,
+                                                 'time': time}]))
+        parser = FilterItemParser()
+        parser.feed(rendered)
+        self.assertEqual(len(parser.items), 1)
+        self.assertEqual(parser.items[0]['data-filter-tags'], movie['tags'])
+        self.assertNotIn('data-filter-tags="Krimi,_Drama A_"B"_', rendered)
+
     def test_delete_dialog_has_three_distinct_actions(self):
         filename = Path(__file__).resolve().parents[1] / 'plugin/controllers/views/responsive/ajax/tagmanager.tmpl'
         template = filename.read_text(encoding='utf-8')

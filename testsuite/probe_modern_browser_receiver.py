@@ -64,14 +64,23 @@ def start_proxy(receiver):
     return server
 
 
-def start_browser(name):
+def start_browser(name, receiver=None):
     binary = BROWSERS[name]
     if name == "chrome":
         options = webdriver.ChromeOptions()
         options.binary_location = binary
         options.add_argument("--headless=new")
         options.set_capability("goog:loggingPrefs", {"browser": "ALL"})
-        return webdriver.Chrome(options=options)
+        browser = webdriver.Chrome(options=options)
+        if receiver is not None:
+            authorization = "Basic " + base64.b64encode(
+                f"{receiver['username']}:{receiver['password']}".encode()
+            ).decode()
+            browser.execute_cdp_cmd('Network.enable', {})
+            browser.execute_cdp_cmd('Network.setExtraHTTPHeaders', {
+                'headers': {'Authorization': authorization}
+            })
+        return browser
     if name == "edge":
         options = webdriver.EdgeOptions()
         options.binary_location = binary
@@ -83,8 +92,8 @@ def start_browser(name):
     return webdriver.Firefox(options=options)
 
 
-def verify(name, origin):
-    browser = start_browser(name)
+def verify(name, origin, receiver=None):
+    browser = start_browser(name, receiver)
     wait = WebDriverWait(browser, 25)
     try:
         if origin is None:
@@ -118,11 +127,59 @@ def verify(name, origin):
         wait.until(lambda _: browser.execute_script(
             "return !!document.querySelector('#at__page--edit:not(.hidden) form[name=atedit]')"
         ))
+        browser.get(origin + "/#at")
+        wait.until(lambda _: browser.execute_script(
+            "return !!document.querySelector('#tag-filter-at') && "
+            "!!document.querySelector('[data-tag-filter-toggle=at]')"
+        ))
+        tags = browser.execute_async_script("""
+            const done = arguments[arguments.length - 1];
+            Promise.all(['/api/tagfiltertags', '/api/gettags'].map(async url => {
+                const response = await fetch(url);
+                const text = await response.text();
+                try { return {status: response.status, body: JSON.parse(text)}; }
+                catch (_) { return {status: response.status, body: text.slice(0, 160)}; }
+            })).then(done).catch(error => done({error: String(error)}));
+        """)
+        print(json.dumps({"browser": name, "tag_api_status":
+                          [response.get('status') for response in tags] if isinstance(tags, list) else tags},
+                         ensure_ascii=False))
+        assert isinstance(tags, list) and tags[0]['status'] == 200, 'Tag filter API failed'
+        assert isinstance(tags[0]['body'], dict), 'Tag filter API returned no JSON'
+        assert isinstance(tags[0]['body'].get('known'), list), 'Tag filter API returned no known tags'
+        browser.find_element(By.CSS_SELECTOR, '[data-tag-filter-toggle="at"]').click()
+        wait.until(lambda _: browser.execute_script(
+            "return !document.querySelector('#tag-filter-at .list-tag-filter-panel').hidden && "
+            "!!document.querySelector('#tag-filter-at .list-tag-filter-options > strong')"
+        ))
+        displayed = browser.execute_script("""
+            return [...document.querySelectorAll('#tag-filter-at .list-tag-filter-options label input')]
+                .map(input => input.value);
+        """)
+        assert set(tags[0]['body']['known']).issubset(displayed), 'Managed tags not displayed in the filter'
+
+        browser.get(origin + "/#bqe")
+        wait.until(lambda _: browser.execute_script(
+            "return !!document.querySelector('#osd__current-event__name')?.textContent?.trim()"
+        ))
+        browser.execute_script("document.querySelector('#osd__current-event').click()")
+        wait.until(lambda _: browser.find_elements(By.CSS_SELECTOR, '#eventdescriptionII button[data-href^="/#/at/new?"]'))
+        browser.execute_script("document.querySelector('#eventdescriptionII button[data-href]').click()")
+        wait.until(lambda _: browser.execute_script(
+            "return location.hash.startsWith('#/at/new?') && "
+            "!!document.querySelector('#at__page--edit:not(.hidden) form[name=atedit]')"
+        ))
+        event_name = browser.execute_script(
+            "return document.querySelector('form[name=atedit] [name=name]').value"
+        )
+        assert event_name, 'EPG AutoTimer form did not receive the event title'
         scripts = browser.execute_script(
             "return [...document.scripts].map(s => s.src).filter(s => /autotimers-app|owif-app|responsive.min/.test(s))"
         )
         print(json.dumps({"browser": name, "bouquets": bouquets, "status": status,
                           "autotimer_click": True, "autotimer_direct": True,
+                          "known_tags": len(tags[0]['body']['known']), "filter_options": len(displayed),
+                          "epg_autotimer": True,
                           "scripts": scripts}, ensure_ascii=False))
     except Exception:
         print(json.dumps({"browser": name, "url": browser.current_url, "snapshot": browser.execute_script(
@@ -142,18 +199,25 @@ def verify(name, origin):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--direct", action="store_true", help="Direct Chrome access with HTTP Basic Auth")
     parser.add_argument("--browsers", nargs="+", choices=BROWSERS, default=list(BROWSERS))
     args = parser.parse_args()
+    if args.direct and (args.self_test or args.browsers != ['chrome']):
+        parser.error('--direct requires receiver access and --browsers chrome')
     server = None
     if not args.self_test:
         target = require_hardware_access(os.environ.get('OPENWEBIF_TEST_RECEIVER_HOST'))
         receiver = json.loads((ROOT / "._work" / ".creds.json").read_text(encoding="utf-8"))[0]
         if receiver['IP'] != target:
             raise RuntimeError('OPENWEBIF_TEST_RECEIVER_HOST stimmt nicht mit dem gespeicherten Gerät überein')
-        server = start_proxy(receiver)
+        if not args.direct:
+            server = start_proxy(receiver)
     try:
         for name in args.browsers:
-            verify(name, None if server is None else f"http://127.0.0.1:{server.server_port}")
+            origin = None if args.self_test else (
+                f"http://{receiver['IP']}" if args.direct else f"http://127.0.0.1:{server.server_port}"
+            )
+            verify(name, origin, receiver if args.direct else None)
     finally:
         if server is not None:
             server.shutdown()
