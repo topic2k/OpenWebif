@@ -540,38 +540,21 @@ function epgKeepVisibleShift(start, end, size, edge) {
 	setTimeout(schedule, 150);
 })();
 var reloadTimers = false;
-function getScrollBarWidth () {
-	var outer = jQuery('<div>').css({visibility: 'hidden', width: 100, overflow: 'scroll'}).appendTo('body'),
-		widthWithScroll = jQuery('<div>').css({width: '100%'}).appendTo(outer).outerWidth();
-	outer.remove();
-	return 100 - widthWithScroll;
-}
-var scrollBarWidth=getScrollBarWidth();
 function fixTableHeight() {
-	var addScrollBarWidth = scrollBarWidth;
-	if (jQuery('#tbl1').width() <= jQuery("#tvcontent").width()){
-		addScrollBarWidth = 0;
-	}
-
-#if $mode == 1
-	var new_height = (jQuery("#epgcard").height() * 0.90 - jQuery("#epgcardheaderI").height() - jQuery("#epgcardheaderII").height() - jQuery("#navepg").height() - addScrollBarWidth - 2);
-	var scrollheightI = new_height + 'px';
-	var scrollwidth = (jQuery("#epgcard").width() - 40 ) + "px";
-	jQuery('#fulltbl').height(scrollheightI);
-	jQuery('#fulltbl').width(scrollwidth);
-#else
-	var new_height = (jQuery("#epgcard").height() * 0.90 - jQuery("#epgcardheaderI").height() - jQuery("#epgcardheaderII").height() - jQuery("#navepg").height() - addScrollBarWidth - 2);
-	var scrollheightI = new_height + 'px';
-	var scrollwidth = (jQuery("#epgcard").width() - 40 ) + "px";
-	jQuery('#fulltbl').height(scrollheightI);
-	jQuery('#fulltbl').width(scrollwidth);
-#end if
+	var table = jQuery('#fulltbl');
+	var card = jQuery('#epgcard');
+	if (!table.length || !card.length) return;
+	resizeModernEpgCard();
+	var body = jQuery('#epgcard > .body');
+	var bottomPadding = parseFloat(body.css('padding-bottom')) || 0;
+	table.height(Math.max(140, card[0].getBoundingClientRect().bottom - table[0].getBoundingClientRect().top - bottomPadding));
+	table.width(body.width());
 }
 fixTableHeight();
 updateEpgDateRange();
 jQuery('#fulltbl').on('scroll', updateEpgDateRange);
 
-jQuery(window).resize(function(){ fixTableHeight(); updateEpgDateRange(); });
+jQuery(window).off('resize.epgTable').on('resize.epgTable', function(){ fixTableHeight(); updateEpgDateRange(); });
 
 #if $mode == 1 and $day == 0 and $week == 0
 (function() {

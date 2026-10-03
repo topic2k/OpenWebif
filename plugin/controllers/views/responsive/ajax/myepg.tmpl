@@ -41,7 +41,19 @@
 </div>
 
 <script>
-	jQuery("#epgcard").height((jQuery("#leftsidemenu").height() - 30) + "px");
+	function resizeModernEpgCard() {
+		var card = jQuery('#epgcard');
+		if (!card.length) return;
+		var cardTop = card[0].getBoundingClientRect().top;
+		var table = jQuery('#fulltbl');
+		var minHeight = 320;
+		if (table.length) {
+			var bottomPadding = parseFloat(jQuery('#epgcard > .body').css('padding-bottom')) || 0;
+			minHeight = table[0].getBoundingClientRect().top - cardTop + 140 + bottomPadding;
+		}
+		card.height(Math.max(window.innerHeight - cardTop - 20, minHeight));
+	}
+	resizeModernEpgCard();
 
 	jQuery(function() {
 		load_tvcontent_spin('ajax/multiepg?epgmode=tv');
