@@ -96,13 +96,38 @@ class TagManagerTemplateTests(unittest.TestCase):
              patch('builtins._', lambda text: text, create=True):
             rendered = str(Template(file=str(folder / 'movies.tmpl'),
                                     searchList=[{'movies': [movie], 'directory': '/movie/',
-                                                 'bookmarks': [], 'transcoding': False,
+                                                 'bookmarks': [], 'transcoding': False, 'recursive': False,
                                                  'time': time}]))
         parser = FilterItemParser()
         parser.feed(rendered)
         self.assertEqual(len(parser.items), 1)
         self.assertEqual(parser.items[0]['data-filter-tags'], movie['tags'])
         self.assertNotIn('data-filter-tags="Krimi,_Drama A_"B"_', rendered)
+
+    def test_modern_movie_view_renders_mode_and_escaped_recording_path(self):
+        folder = Path(__file__).resolve().parents[1] / 'plugin/controllers/views/responsive/ajax'
+        translations = ModuleType('Plugins.Extensions.OpenWebif.controllers.i18n')
+        translations.tstrings = defaultdict(str)
+        defaults = ModuleType('Plugins.Extensions.OpenWebif.controllers.defaults')
+        defaults.isSettingEnabled = lambda name: ''
+        movie = {'eventname': 'Film', 'tags': '', 'servicename': 'Sender', 'serviceref': '1:0:1',
+                 'filename': '/movie/Film & Serien/Staffel 1/aufnahme.ts', 'recordingtime': 1000,
+                 'lastseen': 0, 'length': '1:00', 'filesize_readable': '1 GB',
+                 'description': 'Beschreibung', 'descriptionExtended': ''}
+        with patch.dict('sys.modules', {translations.__name__: translations, defaults.__name__: defaults}), \
+             patch('builtins._', lambda text: text, create=True):
+            for recursive, icon, view in ((False, 'ic:sharp-account-tree', 'folders'),
+                                          (True, 'ic:sharp-view-list', 'list')):
+                with self.subTest(recursive=recursive):
+                    rendered = str(Template(file=str(folder / 'movies.tmpl'),
+                                            searchList=[{'movies': [movie], 'directory': '/movie/Film & Serien/',
+                                                         'bookmarks': ['Staffel 1'], 'transcoding': False,
+                                                         'recursive': recursive, 'time': time}]))
+                    self.assertIn('data-view="' + view + '"', rendered)
+                    self.assertIn('data-directory="/movie/Film &amp; Serien/"', rendered)
+                    self.assertIn('data-icon="' + icon + '"', rendered)
+                    self.assertIn('class="movie-recording-path">/movie/Film &amp; Serien/Staffel 1</span>', rendered)
+                    self.assertIn('value="/movie/Film &amp; Serien/Staffel 1"', rendered)
 
     def test_delete_dialog_has_three_distinct_actions(self):
         filename = Path(__file__).resolve().parents[1] / 'plugin/controllers/views/responsive/ajax/tagmanager.tmpl'

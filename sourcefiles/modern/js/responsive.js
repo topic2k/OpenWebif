@@ -1012,13 +1012,39 @@ function editTimer(serviceref, begin, end, evtid) {
 	
 }
 
+function moviesViewUrl(directory, listView)
+{
+	const params = new URLSearchParams();
+	if (directory) params.set('dirname', directory);
+	if (listView) params.set('recursive', '1');
+	const query = params.toString();
+	return 'ajax/movies' + (query ? '?' + query : '');
+}
+
+function toggleMoviesView()
+{
+	const button = document.querySelector('.movies-view-toggle');
+	if (button) load_maincontent_spin(moviesViewUrl(button.dataset.directory, button.dataset.view !== 'list'));
+}
+
+function openMoviesDirectory(directory)
+{
+	const button = document.querySelector('.movies-view-toggle');
+	if (button) load_maincontent_spin(moviesViewUrl(directory, button.dataset.view === 'list'));
+}
+
+function refreshMoviesView()
+{
+	const button = document.querySelector('.movies-view-toggle');
+	if (button) load_maincontent_spin_force(moviesViewUrl(button.dataset.directory, button.dataset.view === 'list'));
+}
+
 function changeMoviesort(sort)
 {
 	MLHelper.SortMovies(sort);
 	MLHelper.ChangeSort(sort);
 	MLHelper.ReadMovies();
-	lastcontenturl = '';
-	load_maincontent_spin('ajax/movies');
+	refreshMoviesView();
 }
 
 function changeMoviesortSearch(sort)
