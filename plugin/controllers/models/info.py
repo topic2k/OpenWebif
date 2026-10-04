@@ -20,6 +20,7 @@
 
 from os import popen, statvfs
 from os.path import exists, isdir, realpath
+from platform import python_version
 from time import localtime, strftime
 from twisted import version
 from socket import has_ipv6, socket, AF_INET6, AF_INET, SOCK_DGRAM, inet_ntop, inet_pton, getaddrinfo
@@ -335,6 +336,7 @@ def getInfo(session=None, need_fullinfo=False):
 	info["enigmaver"] = getEnigmaVersionString()
 	info["driverdate"] = BoxInfo.getItem("driversdate")
 	info["kernelver"] = BoxInfo.getItem("kernel")
+	info["pythonver"] = python_version()
 
 	try:
 		from Tools.StbHardware import getFPVersion
