@@ -124,6 +124,34 @@ for (const modern of [false, true]) {
 	assert.deepEqual(idle.sweetAlerts, []);
 	assert.deepEqual(idle.requests, ['api/powerstate?newstate=2']);
 
+	for (const state of [2, 3]) {
+		for (const recording of [false, true]) {
+			for (const streaming of [false, true]) {
+				const browser = createBrowser(modern);
+				browser.start(state);
+				browser.resolve({recording, upcoming: false, streaming});
+				const warnings = [];
+				if (recording) warnings.push('Recording');
+				if (streaming) warnings.push('Streaming');
+				if (warnings.length) {
+					assert.deepEqual(browser.requests, []);
+					const message = warnings.join('\n') + '\n\nProceed?';
+					if (modern) {
+						assert.equal(browser.sweetAlerts[0].options.text, message);
+						assert.deepEqual(browser.dialogs, []);
+					} else {
+						assert.equal(browser.dialogs[0].content, message);
+						assert.deepEqual(browser.sweetAlerts, []);
+					}
+				} else {
+					assert.deepEqual(browser.dialogs, []);
+					assert.deepEqual(browser.sweetAlerts, []);
+					assert.deepEqual(browser.requests, ['api/powerstate?newstate=' + state]);
+				}
+			}
+		}
+	}
+
 	for (const malformed of [false, true]) {
 		const failed = createBrowser(modern);
 		failed.start(3);

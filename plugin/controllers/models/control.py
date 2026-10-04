@@ -209,7 +209,7 @@ def remoteControl(key, rctype="", rcu=DEFAULT_RCU):
 def getPowerStateRisks(session):
 	next_recording = session.nav.RecordTimer.getNextRecordingTime()
 	return {
-		"recording": bool(session.nav.getRecordings()),
+		"recording": any(timer.isRunning() and not timer.justplay for timer in session.nav.RecordTimer.timer_list),
 		"upcoming": next_recording > 0 and 0 <= next_recording - time() < 360,
 		"streaming": bool(GetStreamInfo())
 	}

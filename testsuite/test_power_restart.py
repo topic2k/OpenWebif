@@ -19,15 +19,35 @@ class PowerRestartTests(unittest.TestCase):
         cls.namespace = {'time': lambda: 1000, 'GetStreamInfo': lambda: []}
         exec(compile(ast.Module(body=functions, type_ignores=[]), str(CONTROL), 'exec'), cls.namespace)
 
-    def session(self, recordings=(), next_recording=-1):
+    def session(self, recordings=(), timers=(), next_recording=-1):
         nav = SimpleNamespace(getRecordings=lambda: recordings,
-                              RecordTimer=SimpleNamespace(getNextRecordingTime=lambda: next_recording))
+                              RecordTimer=SimpleNamespace(timer_list=timers,
+                                                          getNextRecordingTime=lambda: next_recording))
         return SimpleNamespace(nav=nav)
 
     def test_active_recording(self):
-        risks = self.namespace['getPowerStateRisks'](self.session(recordings=['recording']))
+        timer = SimpleNamespace(isRunning=lambda: True, justplay=False, dontSave=True)
+        risks = self.namespace['getPowerStateRisks'](self.session(recordings=['recording'], timers=[timer]))
         self.assertTrue(risks['recording'])
         self.assertFalse(risks['upcoming'])
+
+    def test_recording_and_streaming_are_independent(self):
+        timer = SimpleNamespace(isRunning=lambda: True, justplay=False)
+        for active_recording in (False, True):
+            for active_stream in (False, True):
+                with self.subTest(recording=active_recording, streaming=active_stream):
+                    recordings = (['recording'] if active_recording else []) + (['stream'] if active_stream else [])
+                    session = self.session(recordings=recordings, timers=[timer] if active_recording else [])
+                    with patch.dict(self.namespace, GetStreamInfo=lambda: [{'ip': '192.0.2.1'}] if active_stream else []):
+                        risks = self.namespace['getPowerStateRisks'](session)
+                    self.assertEqual(risks, {'recording': active_recording,
+                                             'upcoming': False, 'streaming': active_stream})
+
+    def test_inactive_and_zap_timers_are_not_recordings(self):
+        timers = [SimpleNamespace(isRunning=lambda: False, justplay=False),
+                  SimpleNamespace(isRunning=lambda: True, justplay=True)]
+        risks = self.namespace['getPowerStateRisks'](self.session(recordings=['stream'], timers=timers))
+        self.assertFalse(risks['recording'])
 
     def test_upcoming_recording_window(self):
         for seconds, expected in ((0, True), (359, True), (360, False), (600, False), (-10, False)):
