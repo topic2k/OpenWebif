@@ -1347,11 +1347,11 @@ function WebConfig() {
 	});
 	$('#mintimerlist').change(function () {
 		let val = $(this).is(":checked") ? '1' : '0'
-		$.get('api/setwebconfig?mintimerlist=' + val);
-		if ( lastcontenturl === 'ajax/timers') {
-			lastcontenturl = '';
-			load_maincontent('ajax/timers');
-		}
+		$.get('api/setwebconfig?mintimerlist=' + val, function(result) {
+			if (result.result && /^ajax\/timers(?:\?|$)/.test(lastcontenturl)) {
+				load_maincontent_spin_force(lastcontenturl);
+			}
+		});
 	});
 	$('#minepglist').change(function () {
 		let val = $(this).is(":checked") ? '1' : '0'
