@@ -105,8 +105,8 @@ jobs:
           mv * ../../../Rel/
           cd ../../../
 
-      - uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./Rel
-          force_orphan: true
+      #- uses: peaceiris/actions-gh-pages@v4
+      #  with:
+      #    github_token: ${{ secrets.GITHUB_TOKEN }}
+      #    publish_dir: ./Rel
+      #    force_orphan: true
