@@ -29,6 +29,10 @@ python -m unittest discover -s testsuite/integration -p 'test_*.py' -v
 
 Die schnellen bestehenden Testläufe bleiben unverändert und benötigen keinen Browser. Fehlende Browserabhängigkeiten werden im separaten Integrationstest als Fehler gemeldet, nicht übersprungen.
 
+## Neustart-Anzeige im Browser
+
+Mit denselben Browserabhängigkeiten prüft `node --test testsuite/integration/reboot_card_browser_tests.js` die Neustart-Karte mit produktiven Styles und Anzeige-Funktionen in drei Themes und drei Bildschirmgrößen, einschließlich langer Hinweise. Der Test arbeitet mit einer lokalen Testseite und blockiert sämtliche Netzwerkanfragen; ein Receiver wird nicht neu gestartet.
+
 ## Manuelle Hardwareprüfungen
 
 Die älteren HTTP-Integrationstests (`movie_files_testsuite.py`, `status_quo_file_controller.py`) werden standardmäßig übersprungen. Die manuellen Prüfskripte (`receiver_release_check.py`, `probe_modern_browser_receiver.py`, `probe_timer_tags_receiver.js`) sind ebenfalls standardmäßig gesperrt. Es gibt **keine** vorgegebene Geräteadresse mehr.

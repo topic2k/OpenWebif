@@ -396,7 +396,8 @@ var SSHelper = new SSHelperObj();
 
 
 function load_reboot_dialog(data,title){
-	let sp = loadspinner.replace("<p>" + tstr_loading + "...</p>","<p>" + tstr_loading + "...</p><p>" + title + "</p>");
+	let sp = loadspinner.replace("<div class='loader'>", "<div class='loader card'>")
+		.replace("<p>" + tstr_loading + "...</p>","<p>" + tstr_loading + "...</p><p>" + title + "</p>");
 	$("#responsivespinner").html(sp);
 }
 
