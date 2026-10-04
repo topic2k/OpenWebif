@@ -12,8 +12,9 @@ class CreateIpkVersionTests(unittest.TestCase):
     def _assert_version(self, version, packages, build_date, expected, git_date="20260920\n"):
         entries = [SimpleNamespace(name=name, is_file=lambda: True) for name in packages]
         with patch("CI.create_ipk.os.path.exists", return_value=True), \
+                patch("CI.create_ipk.os.path.isdir", return_value=True), \
                 patch("builtins.open", mock_open(read_data=f"## Version {version}\n")), \
-                patch("CI.create_ipk.os.scandir", return_value=entries), \
+                patch("CI.create_ipk.os.scandir", return_value=entries) as scan, \
                 patch("CI.create_ipk.subprocess.check_output") as git_output, \
                 patch("CI.create_ipk.time.strftime", return_value=build_date):
             if isinstance(git_date, Exception):
@@ -21,6 +22,7 @@ class CreateIpkVersionTests(unittest.TestCase):
             else:
                 git_output.return_value = git_date
             self.assertEqual(get_version("unused_root"), (version, expected))
+            scan.assert_called_once_with(str(Path("unused_root", ".dist")))
 
     def test_new_base_version_starts_at_r0(self):
         self._assert_version(
@@ -59,6 +61,36 @@ class CreateIpkVersionTests(unittest.TestCase):
             git_date=subprocess.CalledProcessError(1, "git")
         )
 
+    def test_revision_uses_existing_packages_in_root_and_dist(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, "CHANGES.md").write_text("## Version 2.4.0\n", encoding="utf-8")
+            Path(tmpdir, "enigma2-plugin-extensions-openwebif_2.4.0-git20260920-r4_all.ipk").touch()
+            dist = Path(tmpdir, ".dist")
+            dist.mkdir()
+            (dist / "enigma2-plugin-extensions-openwebif_2.4.0-git20260925-r6_all.ipk").touch()
+            with patch("CI.create_ipk.subprocess.check_output", return_value="20260920\n"), \
+                    patch("CI.create_ipk.time.strftime", return_value="20260928"):
+                self.assertEqual(get_version(tmpdir), ("2.4.0", "git20260928-r7"))
+
+    def test_root_packages_do_not_affect_revision(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, "CHANGES.md").write_text("## Version 2.4.0\n", encoding="utf-8")
+            Path(tmpdir, "enigma2-plugin-extensions-openwebif_2.4.0-git20260930-r99_all.ipk").touch()
+            dist = Path(tmpdir, ".dist")
+            dist.mkdir()
+            (dist / "enigma2-plugin-extensions-openwebif_2.4.0-git20260925-r6_all.ipk").touch()
+            with patch("CI.create_ipk.subprocess.check_output", return_value="20260920\n"), \
+                    patch("CI.create_ipk.time.strftime", return_value="20260928"):
+                self.assertEqual(get_version(tmpdir), ("2.4.0", "git20260928-r7"))
+
+    def test_missing_dist_starts_at_r0_despite_root_packages(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, "CHANGES.md").write_text("## Version 2.4.0\n", encoding="utf-8")
+            Path(tmpdir, "enigma2-plugin-extensions-openwebif_2.4.0-git20260930-r99_all.ipk").touch()
+            with patch("CI.create_ipk.subprocess.check_output", return_value="20260920\n"), \
+                    patch("CI.create_ipk.time.strftime", return_value="20260928"):
+                self.assertEqual(get_version(tmpdir), ("2.4.0", "git20260928-r0"))
+
     def test_consecutive_builds_keep_both_packages(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             Path(tmpdir, "CHANGES.md").write_text("## Version 2.4.0\n", encoding="utf-8")
@@ -76,6 +108,9 @@ class CreateIpkVersionTests(unittest.TestCase):
 
             self.assertTrue(first.name.endswith("_2.4.0-git20260928-r0_all.ipk"))
             self.assertTrue(second.name.endswith("_2.4.0-git20260928-r1_all.ipk"))
+            self.assertEqual(first.parent, Path(tmpdir, ".dist"))
+            self.assertEqual(second.parent, Path(tmpdir, ".dist"))
+            self.assertFalse(list(Path(tmpdir).glob("*.ipk")))
             self.assertEqual(first.read_bytes(), first_contents)
             self.assertTrue(second.is_file())
 

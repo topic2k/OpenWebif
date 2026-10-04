@@ -10,7 +10,7 @@ VER=$(head -n 1 CHANGES.md | grep -i '## Version' | sed 's/^## Version \([[:digi
 # '%cd': committer date (format respects --date= option); '%t': abbreviated tree hash
 GITVER=git$(git log -1 --format="%cd" --date="format:%Y%m%d")-r$(git rev-list HEAD --since=yesterday --count)
 
-PKG=${D}/enigma2-plugin-extensions-openwebif_${VER}-${GITVER}_all.ipk
+PKG=${D}/.dist/enigma2-plugin-extensions-openwebif_${VER}-${GITVER}_all.ipk
 
 popd &> /dev/null
 
@@ -57,6 +57,7 @@ cd ${B}
 
 ls -la
 echo "Create ipk ${PKG}"
+mkdir -p "${D}/.dist"
 ar -r ${PKG} ./debian-binary ./data.tar.gz ./control.tar.gz 
 
 rm -rf ${P}

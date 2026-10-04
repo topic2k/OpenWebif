@@ -87,7 +87,7 @@ jobs:
           ./CI/build.sh
 
           ./CI/create_ipk.sh
-          export PKG1=$(ls -1 *_all.ipk)
+          export PKG1=$(ls -1 .dist/*_all.ipk)
           mkdir Rel
           touch ./Rel/.nojekyll
           mv "${PKG1}" ./Rel

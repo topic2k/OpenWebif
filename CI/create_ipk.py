@@ -152,11 +152,13 @@ def get_version(root_dir):
     )
     latest_date = max(build_date, git_date) if re.fullmatch(r'\d{8}', git_date) else build_date
     latest_revision = -1
-    for entry in os.scandir(root_dir):
-        match = pkg_pattern.fullmatch(entry.name)
-        if match and entry.is_file():
-            latest_date = max(latest_date, match.group(1))
-            latest_revision = max(latest_revision, int(match.group(2)))
+    dist_dir = os.path.join(root_dir, ".dist")
+    if os.path.isdir(dist_dir):
+        for entry in os.scandir(dist_dir):
+            match = pkg_pattern.fullmatch(entry.name)
+            if match and entry.is_file():
+                latest_date = max(latest_date, match.group(1))
+                latest_revision = max(latest_revision, int(match.group(2)))
 
     git_ver = f"git{latest_date}-r{latest_revision + 1}"
 
@@ -175,7 +177,8 @@ def build_ipk(root_dir):
     ver, git_ver = get_version(root_dir)
     pkg_ver = f"{ver}-{git_ver}"
     pkg_filename = f"enigma2-plugin-extensions-openwebif_{pkg_ver}_all.ipk"
-    pkg_path = os.path.join(root_dir, pkg_filename)
+    dist_dir = os.path.join(root_dir, ".dist")
+    pkg_path = os.path.join(dist_dir, pkg_filename)
 
     print(f"Building OpenWebif IPK package: {pkg_filename}")
     print(f"Version: {pkg_ver}")
@@ -315,6 +318,7 @@ exit 0
             ("data.tar.gz", data_data),
             ("control.tar.gz", control_data)
         ]
+        os.makedirs(dist_dir, exist_ok=True)
         write_ar(pkg_path, entries)
 
     print(f"IPK package successfully built: {pkg_path} ({os.path.getsize(pkg_path)} bytes)")

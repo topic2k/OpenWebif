@@ -3,6 +3,7 @@
 *.py[cod]
 *.swp
 *.ipk
+/.dist/
 /.idea
 *~
 /contrib/model_movies/folder
