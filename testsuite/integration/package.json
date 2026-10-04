@@ -1,0 +1,7 @@
+{
+  "name": "openwebif-epg-integration-tests",
+  "private": true,
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

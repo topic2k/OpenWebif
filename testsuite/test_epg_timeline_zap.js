@@ -1,19 +1,12 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
-
-const template = fs.readFileSync(path.join(__dirname, '..', 'plugin', 'controllers', 'views', 'responsive', 'ajax', 'multiepg.tmpl'), 'utf8');
+const {source, runScript, readCss} = require('./test_epg_source');
 
 function clickChannel(mode, ref) {
-	const start = template.lastIndexOf('#if $mode == 1', template.indexOf('jQuery(".service").click('));
-	const end = template.indexOf('jQuery(".plusclick").click(', start);
+	const start = source.lastIndexOf('if (config.mode', source.indexOf("scope.find('.service').click("));
+	const end = source.indexOf("scope.find('.plusclick').click(", start);
 	assert.ok(start !== -1 && end !== -1);
-	const branches = template.slice(start, end).split('#else');
-	const branch = mode === 'guide' ? branches[0] : branches[1];
-	assert.ok(branch, 'Zeitstrahl benötigt einen eigenen Senderklick-Handler');
-	const code = branch.replace(/^#(?:if \$mode == 1|end if)\r?$/gm, '');
+	const code = source.slice(start, end);
 	const calls = [];
 	let selector;
 	let handler;
@@ -31,7 +24,7 @@ function clickChannel(mode, ref) {
 			}
 		};
 	};
-	vm.runInNewContext(code, {jQuery, zapChannel: (...args) => calls.push(args)});
+	runScript(code, {jQuery, scope: {find: jQuery}, zapChannel: (...args) => calls.push(args), config: {mode: mode === 'guide' ? 1 : 2}});
 	assert.equal(selector, mode === 'guide' ? '.service' : '.epg__channel-col');
 	handler.call(channel);
 	return calls;
@@ -50,5 +43,5 @@ test('Sender ohne Referenz lösen in keiner Ansicht ein Umschalten aus', () => {
 });
 
 test('Im Zeitstrahl ist die gesamte Senderspalte als klickbar erkennbar', () => {
-	assert.ok(/\.epg__channel-col\s*\{[^}]*cursor:\s*pointer/.test(template));
+	assert.ok(/\.modern-epg--timeline \.epg__channel-col\s*\{[^}]*cursor:\s*pointer/.test(readCss()));
 });

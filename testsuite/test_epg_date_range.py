@@ -7,6 +7,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / 'plugin/controllers/views/responsive/ajax/multiepg.tmpl'
 DATE_RANGE = ROOT / 'plugin/controllers/views/responsive/ajax/epgdaterange.py'
+EPG_JS = ROOT / 'sourcefiles/modern/js/responsive-multiepg.js'
+EPG_CSS = ROOT / 'sourcefiles/modern/css/multiepg.css'
 
 
 class EpgDateRangeTests(unittest.TestCase):
@@ -32,13 +34,14 @@ class EpgDateRangeTests(unittest.TestCase):
                         template.index('id="epg-date-range"'))
         self.assertLess(template.index('id="epg-date-range"'), template.index('<div id="bqwrap">'))
         self.assertLess(template.index('id="epg-date-range"'),
-                        template.index('#if $mode == 2', template.index('<div id="navepg">')))
+                        template.index('#if $mode == 1', template.index('<div id="bqwrap">')))
         self.assertIn('formatEpgDateRange($slot_start, $tstrings)', template)
 
     def test_date_row_has_equal_spacing_above_and_below(self):
         template = TEMPLATE.read_text(encoding='utf-8')
-        self.assertIn('#navepg > .nav-tabs { margin-bottom: 0; }', template)
-        self.assertIn('#epg-date-range { clear: both; font-size: 18px; line-height: 1.4; margin: 12px 4px; }', template)
+        css = EPG_CSS.read_text(encoding='utf-8')
+        self.assertRegex(css, r'\.modern-epg #navepg > \.nav-tabs\s*\{[^}]*\bmargin-bottom:\s*0\s*;')
+        self.assertIn('.modern-epg #epg-date-range { clear: both; font-size: 18px; line-height: 1.4; margin: 12px 4px; }', css)
         self.assertNotIn('<br clear="all">', template)
         self.assertNotIn('id="bqlist" class="nav nav-tabs tab--skinned" style="margin-top: -10px;', template)
 
@@ -51,14 +54,16 @@ class EpgDateRangeTests(unittest.TestCase):
         labels = self.get_date_labels(self.translations)
         self.assertEqual(labels['weekdays'][4], 'Do')
         self.assertEqual(labels['months'][8:10], ['Sep', 'Okt'])
-        self.assertIn('var epgDateLabels = $dumps($getEpgDateLabels($tstrings));', TEMPLATE.read_text(encoding='utf-8'))
+        self.assertIn("'dateLabels': $getEpgDateLabels($tstrings)", TEMPLATE.read_text(encoding='utf-8'))
+        self.assertIn('config.dateLabels', EPG_JS.read_text(encoding='utf-8'))
 
     def test_client_refreshes_both_views_after_scroll_resize_and_initial_jump(self):
         template = TEMPLATE.read_text(encoding='utf-8')
-        self.assertIn("jQuery('#fulltbl').on('scroll', updateEpgDateRange);", template)
-        self.assertIn('fixTableHeight(); updateEpgDateRange();', template)
-        self.assertIn('autoJumpTimeline();', template)
-        self.assertIn('autoJumpTvGuide();', template)
+        source = EPG_JS.read_text(encoding='utf-8')
+        self.assertIn("jQuery('#fulltbl').on('scroll', updateEpgDateRange);", source)
+        self.assertIn('fixTableHeight(); updateEpgDateRange();', source)
+        self.assertIn('autoJumpTimeline();', source)
+        self.assertIn('autoJumpTvGuide();', source)
         self.assertIn('data-begin="${event.begin_timestamp}" data-end="$end"', template)
 
 

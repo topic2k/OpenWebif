@@ -25,7 +25,7 @@ test('Das Timer-Menü passt sich langen übersetzten Beschriftungen an', () => {
 
 test('Das AutoTimer-Menü oben rechts enthält ausschließlich die Stichwort-Verwaltung', () => {
 	const header = autotimer.slice(autotimer.indexOf('<h2 id="configtitle">'), autotimer.indexOf('<div class="body atbody">'));
-	assert.match(header, /<ul class="header-dropdown m-r-5">[\s\S]*?<i class="material-icons">more_vert<\/i>/);
+	assert.match(header, /<ul class="header-dropdown list-tag-filter-toolbar m-r-5">[\s\S]*?<i class="material-icons">more_vert<\/i>/);
 	const menu = header.match(/<ul class="dropdown-menu pull-right" id="atbuttons">([\s\S]*?)<\/ul>/);
 	assert.ok(menu);
 	assert.match(menu[1], /href="#tagmanager"[^>]*>.*\$tstrings\['manage_tags'\]/);

@@ -16,6 +16,7 @@ SERVICES = ROOT / 'plugin/controllers/models/services.py'
 AJAX = ROOT / 'plugin/controllers/ajax.py'
 RENDERER = ROOT / 'plugin/controllers/views/responsive/ajax/renderevtblock.py'
 TEMPLATE = ROOT / 'plugin/controllers/views/responsive/ajax/multiepg.tmpl'
+EPG_CSS = ROOT / 'sourcefiles/modern/css/multiepg.css'
 
 
 class EpgTimerMarkerTests(unittest.TestCase):
@@ -65,7 +66,7 @@ class EpgTimerMarkerTests(unittest.TestCase):
         result = namespace['getMultiEpg'](controller, 'bouquet',
                                           start + 3630 if begin_time is None else begin_time,
                                           None, mode, modern=modern)
-        return [event for slot in result['events']['Channel'] for event in slot]
+        return [event for slot in result['events'][ref if modern else 'Channel'] for event in slot]
 
     def test_short_zap_timer_is_assigned_to_its_event_in_both_views(self):
         start = int(mktime((2026, 9, 28, 0, 0, 0, -1, -1, -1)))
@@ -302,12 +303,13 @@ class EpgTimerMarkerTests(unittest.TestCase):
         self.assertNotIn('id', identity)
 
     def test_marker_colors_are_shared_between_views(self):
-        self.assertIn('.epg__event.event--has-timer::after', self.template)
-        self.assertIn('.event.event--has-timer::before', self.template)
-        self.assertIn('background: var(--epg-timer-marker)', self.template)
+        css = EPG_CSS.read_text(encoding='utf-8')
+        self.assertIn('.modern-epg .epg__event.event--has-timer::after', css)
+        self.assertIn('.modern-epg--timeline .event.event--has-timer::before', css)
+        self.assertIn('background: var(--epg-timer-marker)', css)
         for timer_type, color in (('record', '#e53935'), ('zap', '#1e88e5')):
-            self.assertIn('.timer--' + timer_type + ' { --epg-timer-marker: ' + color, self.template)
-        self.assertIn('.timer--record-zap { --epg-timer-marker: linear-gradient(to bottom, #e53935 50%, #1e88e5 50%)', self.template)
+            self.assertIn('.modern-epg .timer--' + timer_type + ' { --epg-timer-marker: ' + color, css)
+        self.assertIn('.modern-epg .timer--record-zap { --epg-timer-marker: linear-gradient(to bottom, #e53935 50%, #1e88e5 50%)', css)
 
 
 if __name__ == '__main__':

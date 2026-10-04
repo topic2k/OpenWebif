@@ -1,10 +1,7 @@
 const assert = require('node:assert/strict');
-const { readFileSync } = require('node:fs');
-const path = require('node:path');
 const { test } = require('node:test');
-const vm = require('node:vm');
+const {functionSource, runScript} = require('./test_epg_source');
 
-const template = readFileSync(path.join(__dirname, '../plugin/controllers/views/responsive/ajax/multiepg.tmpl'), 'utf8');
 const weekdays = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 const months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 const stamp = (day, hour, minute = 0) => new Date(2026, 9, day, hour, minute).getTime() / 1000;
@@ -17,11 +14,8 @@ function element(rect, attributes = {}, children = {}) {
 	};
 }
 
-function displayDate({ magazine, scrollTop = 0, scrollLeft = 0, width = 600, rows }) {
-	const start = template.indexOf('function updateEpgDateRange() {');
-	const end = template.indexOf('\n}', start);
-	assert.ok(start !== -1 && end !== -1, 'visible date update function is missing');
-	const source = template.slice(start, end + 2);
+function displayDate({ magazine, scrollTop = 0, scrollLeft = 0, width = 600, rows, disposed = false, replaced = false }) {
+	const source = functionSource('alive') + '\n' + functionSource('updateEpgDateRange');
 	const label = {textContent: ''};
 	const container = element({top: 100, bottom: 500, left: 0, right: width}, {
 		'data-slot-start': stamp(1, 0), 'data-first': stamp(1, 0)
@@ -33,9 +27,10 @@ function displayDate({ magazine, scrollTop = 0, scrollLeft = 0, width = 600, row
 	container.scrollLeft = scrollLeft;
 	container.clientWidth = width;
 	container.classList = {contains: name => magazine && name === 'epg__tv-guide'};
-	vm.runInNewContext(source + '\nupdateEpgDateRange();', {
-		document: {getElementById: id => id === 'fulltbl' ? container : label},
-		epgDateLabels: {weekdays, months}, Date
+	runScript(source + '\nupdateEpgDateRange();', {
+		document: {getElementById: id => id === 'fulltbl' ? (replaced ? {} : container) : label},
+		tableNode: container, disposed,
+		config: {slotStart: stamp(1, 0), dateLabels: {weekdays, months}}, Date
 	});
 	return label.textContent;
 }
@@ -68,4 +63,11 @@ test('Zeitstrahl berücksichtigt nur das sichtbare Zeitfenster und über Mittern
 	assert.equal(displayDate({magazine: false, rows: [row]}), 'Mi, 30.Sep 2026 / Do, 1.Okt 2026');
 	assert.equal(displayDate({magazine: false, rows: [row], scrollLeft: 14 * 600}), 'Do, 1.Okt 2026');
 	assert.equal(displayDate({magazine: false, rows: [row], scrollLeft: 23 * 600 + 45 * 10}), 'Do, 1.Okt 2026 / Fr, 2.Okt 2026');
+});
+
+test('beide Ansichten ändern das Datum nach Entsorgung oder Ersetzen der Tabelle nicht mehr', () => {
+	for (const magazine of [true, false]) {
+		assert.equal(displayDate({magazine, rows: [], disposed: true}), '');
+		assert.equal(displayDate({magazine, rows: [], replaced: true}), '');
+	}
 });

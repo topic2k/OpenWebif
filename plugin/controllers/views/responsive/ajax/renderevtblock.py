@@ -59,7 +59,7 @@ class renderEvtBlock:
 			begints,
 			endts,
 			strftime("%H:%M", localtime(event['begin_timestamp'])),
-			event['title'],
+			escape(event['title'], quote=False),
 			shortdesc,
 			timermarker
 		)

@@ -1,17 +1,9 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
-
-const template = fs.readFileSync(path.join(__dirname, '..', 'plugin', 'controllers', 'views', 'responsive', 'ajax', 'multiepg.tmpl'), 'utf8');
+const {source, functionSource, sourceSection, runScript} = require('./test_epg_source');
 
 function keepVisibleShift(start, end, size, edge) {
-	const beginning = template.indexOf('function epgKeepVisibleShift(');
-	const ending = template.indexOf('\n}', beginning);
-	assert.ok(beginning >= 0 && ending > beginning, 'shared EPG visibility calculation is missing');
-	const context = {};
-	vm.runInNewContext(template.slice(beginning, ending + 2), context);
+	const context = runScript(functionSource('epgKeepVisibleShift'));
 	return context.epgKeepVisibleShift(start, end, size, edge);
 }
 
@@ -29,14 +21,13 @@ test('Zeitstrahl: Text langer Sendungen bleibt sichtbar, ohne über ihr Ende hin
 });
 
 test('beide modernen Ansichten verwenden die begrenzte Verschiebung', () => {
-	assert.match(template, /cell\.querySelectorAll\('\.epg__event'\)[\s\S]*?epgKeepVisibleShift\(start, end, event\.offsetHeight, edge\)/);
-	assert.match(template, /row\.querySelectorAll\('\.eventlist \.event\[data-begin\]'\)[\s\S]*?epgKeepVisibleShift\(start, eventBounds\.right, info\.offsetWidth, edge\)/);
+	assert.match(source, /cell\.querySelectorAll\('\.epg__event'\)[\s\S]*?epgKeepVisibleShift\(start, end, event\.offsetHeight, edge\)/);
+	assert.match(source, /row\.querySelectorAll\('\.eventlist \.event\[data-begin\]'\)[\s\S]*?epgKeepVisibleShift\(start, eventBounds\.right, info\.offsetWidth, edge\)/);
 });
 
 function runScroll(mode) {
-	const beginning = template.indexOf('function epgKeepVisibleShift(');
-	const ending = template.indexOf('var reloadTimers = false;', beginning);
-	const script = template.slice(beginning, ending);
+	const script = ['alive', 'epgKeepVisibleShift', 'updateKeepVisible', 'schedule'].map(functionSource).join('\n') + '\n' +
+		sourceSection("tableNode.addEventListener('scroll', schedule);", 'function fixTableHeight()');
 	let update;
 	const container = {
 		classList: {contains: name => mode === 'guide' && name === 'epg__tv-guide'},
@@ -80,12 +71,12 @@ function runScroll(mode) {
 		elements = {info, setScroll: value => { scroll = value; }};
 	}
 	const context = {
-		document: {getElementById: () => container}, window: {},
+		document: {getElementById: () => container}, window: {}, tableNode: container, disposed: false, pending: false,
 		jQuery: () => ({off() { return this; }, on() { return this; }}),
 		requestAnimationFrame: callback => callback(), setTimeout: () => {}
 	};
-	vm.runInNewContext(script, context);
-	return {elements, update};
+	const result = runScript(script, context);
+	return {elements, update, context: result};
 }
 
 test('Zeitschrift: beim Scrollen verdeckt eine Sendung ihre Nachfolger nicht', () => {
@@ -112,4 +103,21 @@ test('Zeitstrahl: Text folgt horizontalem Scrollen und bleibt im Sendungsblock',
 	elements.setScroll(0);
 	update();
 	assert.equal(elements.info._epgShift, 540);
+});
+
+test('beide Ansichten verschieben nach Entsorgung oder Ersetzen der Tabelle keine Texte mehr', () => {
+	for (const mode of ['guide', 'timeline']) {
+		for (const replaced of [false, true]) {
+			const {elements, update, context} = runScroll(mode);
+			const item = mode === 'guide' ? elements.first : elements.info;
+			const shift = item._epgShift;
+			const transform = item.style.transform;
+			elements.setScroll(200);
+			if (replaced) context.document.getElementById = () => ({});
+			else context.disposed = true;
+			update();
+			assert.equal(item._epgShift, shift);
+			assert.equal(item.style.transform, transform);
+		}
+	}
 });

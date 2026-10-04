@@ -52,6 +52,26 @@ MODERN:
 jQuery and Bootstrap are currently used for some functionality, but the 
 intention is to remove these dependencies completely from the Modern interface.
 
+### Modern EPG
+
+The magazine and timeline share `modern/js/responsive-multiepg.js` (initialization,
+navigation, calendar, layout and lifecycle) and `modern/js/epgtime.js` (timestamps,
+two-hour slots, timeline coordinates and local calendar dates). Styles live in
+`modern/css/multiepg.css`, scoped to `.modern-epg`; timeline-only rules use
+`.modern-epg--timeline` so they cannot affect the magazine or other pages.
+
+The responsive `multiepg.tmpl` renders markup and an HTML-escaped JSON configuration,
+then calls `ModernEpg.init`. Its shared `epgdaterange.py` helper derives midnight
+and prime-time timestamps from the server's `slot_start`. `myepg.tmpl` only starts
+the surrounding card via `ModernEpg.initShell`. Each AJAX render gets its own
+configuration; removing it disposes intervals, delayed updates and page handlers.
+
+The modern main template loads the generated styles and scripts once, with
+`epgtime.min.js` before `responsive-multiepg.min.js`. Rebuild the modern JS and CSS
+after editing their sources and include the generated assets when distributing
+changes. No classic EPG assets or templates are involved. Browser integration
+instructions are in [`testsuite/README.md`](../testsuite/README.md).
+
 ### Compile JS
 `cd` to the repo root, then run
 

@@ -2,16 +2,12 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const { test } = require('node:test');
-const vm = require('node:vm');
+const {functionSource, runScript} = require('./test_epg_source');
 
 const template = readFileSync(path.join(__dirname, '../plugin/controllers/views/responsive/ajax/multiepg.tmpl'), 'utf8').replace(/\r\n/g, '\n');
 
 function renderMarker(now, slotStart, rowHeights) {
-	const start = template.indexOf('function updateTvGuideNowMarker() {');
-	assert.notEqual(start, -1, 'TV guide now-marker function is missing');
-	const end = template.indexOf('\n\t}', start);
-	assert.notEqual(end, -1);
-	const functionBody = template.slice(start, end + 3).replace('$slot_start', 'slotStart');
+	const functionBody = functionSource('updateTvGuideNowMarker');
 	const marker = { length: 1, styles: {}, visible: false,
 		css(styles) { Object.assign(this.styles, styles); return this; },
 		show() { this.visible = true; return this; },
@@ -29,8 +25,11 @@ function renderMarker(now, slotStart, rowHeights) {
 		'#fulltbl': { offset() { return { top: 100 }; }, scrollTop() { return scrollTop; } },
 		'#tbl1': { outerWidth() { return 900; } }
 	};
-	const context = { jQuery: selector => selections[selector], Date: { now: () => now * 1000 }, slotStart, marker };
-	vm.runInNewContext(functionBody + '\nupdateTvGuideNowMarker();', context);
+	const context = {
+		jQuery: selector => selections[selector], scope: {find: selector => selections[selector]},
+		Date: { now: () => now * 1000 }, config: {slotStart}, marker
+	};
+	runScript(functionBody + '\nupdateTvGuideNowMarker();', context);
 	return marker;
 }
 

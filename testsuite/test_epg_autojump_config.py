@@ -4,12 +4,9 @@ import os
 import sys
 import types
 import unittest
-
-if not hasattr(os, 'statvfs'):
-	os.statvfs = lambda *args: None
-
-_orig_listdir = os.listdir
-os.listdir = lambda path: _orig_listdir(path) if os.path.exists(path) else []
+from contextlib import ExitStack
+from importlib.machinery import ModuleSpec
+from unittest.mock import MagicMock, patch
 
 # Setup mock modules for Enigma2 components
 components = types.ModuleType('Components')
@@ -33,9 +30,6 @@ tools_directories.fileExists = lambda *args: True
 tools_directories.isPluginInstalled = lambda *args: False
 tools.Directories = tools_directories
 
-from importlib.machinery import ModuleSpec
-from unittest.mock import MagicMock
-
 
 class MockLoader(object):
 	def create_module(self, spec):
@@ -55,8 +49,6 @@ class MockFinder(object):
 			return ModuleSpec(fullname, MockLoader(), is_package=True)
 		return None
 
-
-sys.meta_path.insert(0, MockFinder)
 
 twisted = types.ModuleType('twisted')
 twisted.__path__ = []
@@ -97,23 +89,10 @@ twisted_protocols_basic.FileSender = type('FileSender', (object,), {})
 twisted_protocols.basic = twisted_protocols_basic
 twisted.protocols = twisted_protocols
 
-sys.modules['twisted'] = twisted
-sys.modules['twisted.internet'] = twisted_internet
-sys.modules['twisted.internet.defer'] = twisted_internet.defer
-sys.modules['twisted.internet.reactor'] = twisted_internet.reactor
-sys.modules['twisted.protocols'] = twisted_protocols
-sys.modules['twisted.protocols.basic'] = twisted_protocols_basic
-sys.modules['twisted.web'] = twisted_web
-sys.modules['twisted.web.resource'] = twisted_web_resource
-sys.modules['twisted.web.server'] = twisted_web_server
-sys.modules['twisted.web.http'] = twisted_web_http
-
 cheetah = types.ModuleType('Cheetah')
 cheetah_template = types.ModuleType('Cheetah.Template')
 cheetah_template.Template = type('Template', (object,), {})
 cheetah.Template = cheetah_template
-sys.modules['Cheetah'] = cheetah
-sys.modules['Cheetah.Template'] = cheetah_template
 
 
 class LanguageMock(object):
@@ -135,12 +114,6 @@ components_language.language = LanguageMock()
 components_config.config = ConfigMock()
 components.Language = components_language
 components.config = components_config
-sys.modules['Components'] = components
-sys.modules['Components.Language'] = components_language
-sys.modules['Components.config'] = components_config
-sys.modules['Components.SystemInfo'] = components_systeminfo
-sys.modules['Tools'] = tools
-sys.modules['Tools.Directories'] = tools_directories
 screens = types.ModuleType('Screens')
 screens.__path__ = []
 screens_infobar = types.ModuleType('Screens.InfoBar')
@@ -154,10 +127,6 @@ screens_channelselection.FLAG_SERVICE_NEW_FOUND = 0
 screens.InfoBar = screens_infobar
 screens.ChannelSelection = screens_channelselection
 
-sys.modules['Screens'] = screens
-sys.modules['Screens.InfoBar'] = screens_infobar
-sys.modules['Screens.ChannelSelection'] = screens_channelselection
-
 
 class MockModule(types.ModuleType):
 	def __getattr__(self, name):
@@ -169,15 +138,6 @@ class MockModule(types.ModuleType):
 enigma = MockModule('enigma')
 enigma.eEnv = MockModule('eEnv')
 enigma.eEnv.resolve = lambda *args: ""
-sys.modules['enigma'] = enigma
-sys.modules['twisted'] = twisted
-sys.modules['twisted.web'] = twisted_web
-sys.modules['twisted.web.resource'] = twisted_web_resource
-sys.modules['twisted.web.server'] = twisted_web_server
-
-sys.path.append(os.path.join(os.path.dirname(__file__), '../plugin'))
-
-from controllers.i18n import tstrings
 
 
 class ConfigItemMock(object):
@@ -189,7 +149,43 @@ class ConfigItemMock(object):
 
 
 class EpgAutoJumpTestCase(unittest.TestCase):
+	def setUp(self):
+		stack = ExitStack()
+		self.addCleanup(stack.close)
+		stack.enter_context(patch.dict(sys.modules, {
+			'twisted': twisted,
+			'twisted.internet': twisted_internet,
+			'twisted.internet.defer': twisted_internet.defer,
+			'twisted.internet.reactor': twisted_internet.reactor,
+			'twisted.protocols': twisted_protocols,
+			'twisted.protocols.basic': twisted_protocols_basic,
+			'twisted.web': twisted_web,
+			'twisted.web.resource': twisted_web_resource,
+			'twisted.web.server': twisted_web_server,
+			'twisted.web.http': twisted_web_http,
+			'Cheetah': cheetah,
+			'Cheetah.Template': cheetah_template,
+			'Components': components,
+			'Components.Language': components_language,
+			'Components.config': components_config,
+			'Components.SystemInfo': components_systeminfo,
+			'Tools': tools,
+			'Tools.Directories': tools_directories,
+			'Screens': screens,
+			'Screens.InfoBar': screens_infobar,
+			'Screens.ChannelSelection': screens_channelselection,
+			'enigma': enigma,
+		}))
+		stack.enter_context(patch.object(sys, 'meta_path', [MockFinder] + sys.meta_path))
+		stack.enter_context(patch.object(sys, 'path', sys.path + [os.path.join(os.path.dirname(__file__), '../plugin')]))
+		if not hasattr(os, 'statvfs'):
+			stack.enter_context(patch.object(os, 'statvfs', lambda *args: None, create=True))
+		_orig_listdir = os.listdir
+		stack.enter_context(patch.object(os, 'listdir', lambda path: _orig_listdir(path) if os.path.exists(path) else []))
+
 	def test_i18n_keys(self):
+		from controllers.i18n import tstrings
+
 		self.assertIn('epg_autojump', tstrings)
 		self.assertIn('epg_jump_now', tstrings)
 		self.assertIn('epg_jump_active_service', tstrings)
@@ -222,6 +218,24 @@ class EpgAutoJumpTestCase(unittest.TestCase):
 		res3 = web.P_setwebconfig(FakeRequest("epg_jump_now", "false"))
 		self.assertEqual(res3, {"result": True})
 		self.assertFalse(components_config.config.OpenWebif.webcache.epg_jump_now.value)
+
+
+class EpgAutoJumpIsolationTests(unittest.TestCase):
+	def test_mocks_are_removed_after_running_config_tests(self):
+		modules = sys.modules.copy()
+		meta_path = sys.meta_path[:]
+		path = sys.path[:]
+		listdir = os.listdir
+		statvfs = getattr(os, 'statvfs', None)
+		result = unittest.TestResult()
+		unittest.defaultTestLoader.loadTestsFromTestCase(EpgAutoJumpTestCase).run(result)
+		self.assertTrue(result.wasSuccessful(), (result.errors, result.failures))
+		self.assertEqual(result.testsRun, 2)
+		self.assertEqual(sys.modules, modules)
+		self.assertEqual(sys.meta_path, meta_path)
+		self.assertEqual(sys.path, path)
+		self.assertIs(os.listdir, listdir)
+		self.assertIs(getattr(os, 'statvfs', None), statvfs)
 
 
 if __name__ == '__main__':

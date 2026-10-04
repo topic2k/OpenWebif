@@ -1,4 +1,16 @@
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
+
+
+def getEpgTimeContext(slot_start):
+	slot_date = datetime(*time.localtime(slot_start)[:3])
+	today = datetime(*time.localtime(time.time())[:3])
+	return {
+		'first': int(time.mktime(slot_date.timetuple())),
+		'prime_times': [int(time.mktime(slot_date.replace(hour=hour).timetuple())) for hour in (6, 12, 20)],
+		'weekdays': [((today + timedelta(days=offset)).weekday() + 1) % 7 for offset in range(7)],
+		'weeks': ['%02d' % (today + timedelta(days=7 * offset)).isocalendar()[1] for offset in range(3)]
+	}
 
 
 def formatEpgDateRange(slot_start, tstrings):

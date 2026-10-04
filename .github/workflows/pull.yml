@@ -7,13 +7,15 @@ on:
   workflow_dispatch:
 
 jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml
+
   build:
+    needs: tests
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: 'main'
 
       - uses: actions/setup-python@v5
         with:
@@ -49,8 +51,6 @@ jobs:
           python testsuite/evil_eval.py
 
       - uses: actions/checkout@v4
-        with:
-          ref: 'main'
 
       - uses: actions/setup-python@v5
         with:

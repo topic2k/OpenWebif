@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const {source, functionSource, iifeSource, runScript, readCss} = require('./test_epg_source');
 
 const template = fs.readFileSync(path.join(__dirname, '..', 'plugin', 'controllers', 'views', 'responsive', 'ajax', 'multiepg.tmpl'), 'utf8');
 
@@ -14,29 +15,24 @@ test('calendar is placed before weekdays in the shared modern navigation', () =>
 });
 
 test('open calendar is not clipped by the scrollable weekday navigation', () => {
-	assert.match(template, /#navepg > \.nav-tabs\.epg-calendar-open\s*\{\s*overflow:\s*visible;/);
-	assert.match(template, /nav\.toggleClass\('epg-calendar-open', popup\.is\(':visible'\)\)/);
-	assert.match(template, /nav\.removeClass\('epg-calendar-open'\)/);
+	assert.match(readCss(), /\.modern-epg #navepg > \.nav-tabs\.epg-calendar-open\s*\{\s*overflow:\s*visible;/);
+	assert.match(source, /nav\.toggleClass\('epg-calendar-open', popup\.is\(':visible'\)\)/);
+	assert.match(source, /nav\.removeClass\('epg-calendar-open'\)/);
 });
 
 test('date offset counts civil days across daylight saving and ignores navigation sentinels', () => {
-	const start = template.indexOf('function epgCalendarDayOffset(');
-	const end = template.indexOf('\n}', start);
-	assert.ok(start !== -1 && end !== -1);
-	const context = {};
-	vm.runInNewContext(template.slice(start, end + 2), context);
-	assert.equal(context.epgCalendarDayOffset(new Date(2026, 9, 2), new Date(2026, 9, 1)), 1);
-	assert.equal(context.epgCalendarDayOffset(new Date(2026, 9, 27), new Date(2026, 9, 24)), 3);
-	assert.equal(context.epgCalendarDayOffset(new Date(2026, 9, 1), new Date(2026, 9, 3)), -2);
-	assert.equal(context.epgCalendarDayOffset(new Date(2027, 3, 22), new Date(2026, 9, 2)), 202);
-	assert.match(template, /ajax\/multiepg\?bref=.*&day=' \+ epgCalendarDayOffset/);
-	assert.match(template, /api\/epgcalendar\?bref=/);
+	const context = runScript('');
+	assert.equal(context.EpgTime.dayOffset(new Date(2026, 9, 2), new Date(2026, 9, 1)), 1);
+	assert.equal(context.EpgTime.dayOffset(new Date(2026, 9, 27), new Date(2026, 9, 24)), 3);
+	assert.equal(context.EpgTime.dayOffset(new Date(2026, 9, 1), new Date(2026, 9, 3)), -2);
+	assert.equal(context.EpgTime.dayOffset(new Date(2027, 3, 22), new Date(2026, 9, 2)), 202);
+	assert.match(source, /ajax\/multiepg\?bref=.*&day=' \+ EpgTime\.dayOffset/);
+	assert.match(source, /api\/epgcalendar\?bref=/);
 });
 
 test('loaded EPG dates are bold and clicking a date loads that day for TV and radio', () => {
-	const start = template.search(/\(function\(\) \{\r?\n\s*var toggle = jQuery\('#epg-calendar-toggle'\)/);
-	const end = template.indexOf('})();', start);
-	assert.ok(start !== -1 && end !== -1);
+	const script = functionSource('alive') + '\n' + iifeSource("var toggle = jQuery('#epg-calendar-toggle')");
+	const serverSelected = new Date(2027, 0, 21);
 	for (const mode of ['tv', 'radio']) {
 		const buttons = [];
 		const handlers = {};
@@ -56,7 +52,8 @@ test('loaded EPG dates are bold and clicking a date loads that day for TV and ra
 			on(_event, handler) { handlers.toggle = handler; }
 		};
 		const controls = {on(_event, handler) { handlers.month = handler; }};
-		const doc = {off() { return this; }, on() { return this; }};
+		const tableNode = {};
+		const doc = {getElementById: () => tableNode, off() { return this; }, on() { return this; }};
 		const content = {html() { return this; }, load(url) { requests.push(url); }};
 		const jQuery = selector => {
 			if (selector === '#epg-calendar-toggle') return toggle;
@@ -90,25 +87,27 @@ test('loaded EPG dates are bold and clicking a date loads that day for TV and ra
 			pending.push(request);
 			return request;
 		};
-		const context = {jQuery, document: doc, window, loadspinner: '', encodeURIComponent, Set, Date, String, JSON};
-		vm.runInNewContext(template.slice(template.indexOf('function epgCalendarDayOffset('), end + 5)
-			.replaceAll('$day', '0').replaceAll('$week', '0').replaceAll('$epgmode', mode), context);
+		const context = runScript(script, {
+			jQuery, document: doc, window, loadspinner: '', encodeURIComponent, Set, Date, String, JSON,
+			tableNode, disposed: false, config: {day: 0, week: 0, epgmode: mode, slotStart: serverSelected.getTime() / 1000}
+		});
 		assert.equal(requests.length, 1, 'dates are prefetched before the calendar opens');
 		handlers.toggle({stopPropagation() {}});
 		assert.equal(nav.open, true);
 		assert.match(requests[0], /api\/epgcalendar\?bref=bouquet%20%26%20test/);
+		assert.match(requests[0], /&year=2027&month=1$/);
+		assert.equal(buttons.find(button => button.number === 21).classes['is-selected'], true);
+		assert.equal(buttons.find(button => button.number === 7).classes['is-selected'], false);
 		assert.equal(requests.length, 1, 'opening while a prefetch is pending does not duplicate it');
-		vm.runInNewContext(template.slice(template.indexOf('function epgCalendarDayOffset('), end + 5)
-			.replaceAll('$day', '0').replaceAll('$week', '0').replaceAll('$epgmode', mode), context);
+		vm.runInContext(script, context);
 		assert.equal(requests.length, 1, 'switching views while loading shares the pending request');
-		const chosen = new Date();
+		const chosen = new Date(serverSelected);
 		chosen.setDate(7);
 		const iso = [chosen.getFullYear(), String(chosen.getMonth() + 1).padStart(2, '0'), '07'].join('-');
 		pending[0].respond({result: true, days: [iso]});
 		assert.equal(buttons.find(button => button.number === 7).classes['has-epg'], true);
 		assert.equal(buttons.find(button => button.number === 8).classes['has-epg'], false);
-		vm.runInNewContext(template.slice(template.indexOf('function epgCalendarDayOffset('), end + 5)
-			.replaceAll('$day', '0').replaceAll('$week', '0').replaceAll('$epgmode', mode), context);
+		vm.runInContext(script, context);
 		assert.equal(requests.length, 1, 'switching views reuses the fetched days');
 		handlers.toggle({stopPropagation() {}});
 		handlers.toggle({stopPropagation() {}});

@@ -1,22 +1,6 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
-
-const myepg = fs.readFileSync(path.join(__dirname, '..', 'plugin', 'controllers', 'views', 'responsive', 'ajax', 'myepg.tmpl'), 'utf8');
-const multiepg = fs.readFileSync(path.join(__dirname, '..', 'plugin', 'controllers', 'views', 'responsive', 'ajax', 'multiepg.tmpl'), 'utf8');
-
-function functionSource(template, name) {
-	const start = template.indexOf('function ' + name + '() {');
-	assert.notEqual(start, -1, name + ' muss in der modernen Vorlage definiert sein');
-	let depth = 0;
-	for (let index = template.indexOf('{', start); index < template.length; index++) {
-		if (template[index] === '{') depth++;
-		if (template[index] === '}' && --depth === 0) return template.slice(start, index + 1);
-	}
-	throw new Error('Unvollständige Funktion ' + name);
-}
+const {functionSource, runScript} = require('./test_epg_source');
 
 function layout(viewport, cardTop, tableTop) {
 	const state = {viewport, cardTop, tableTop, cardHeight: 0, tableHeight: 0, tableWidth: 0};
@@ -39,9 +23,8 @@ function layout(viewport, cardTop, tableTop) {
 		};
 		throw new Error('Unerwarteter Selektor: ' + selector);
 	};
-	const source = functionSource(myepg, 'resizeModernEpgCard') + '\n' + functionSource(multiepg, 'fixTableHeight');
-	const context = {jQuery, window: {get innerHeight() { return state.viewport; }}};
-	vm.runInNewContext(source, context);
+	const source = functionSource('resizeModernEpgCard') + '\n' + functionSource('fixTableHeight');
+	const context = runScript(source, {jQuery, window: {get innerHeight() { return state.viewport; }}});
 	return {state, resize: () => context.fixTableHeight()};
 }
 

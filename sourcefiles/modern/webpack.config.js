@@ -10,6 +10,7 @@ const paths = {
 
 const legacyJsFiles = [
   path.resolve(__dirname, 'js', 'responsive-epgr.js'),
+  path.resolve(__dirname, 'js', 'epgtime.js'),
   path.resolve(__dirname, 'js', 'responsive-multiepg.js'),
   path.resolve(__dirname, 'js', 'bootstrap-date-timepicker.js'),
   path.resolve(__dirname, 'js', 'admin.js'),

@@ -1,17 +1,8 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
+const {functionSource, sourceSection, runScript} = require('./test_epg_source');
 
-const template = fs.readFileSync(path.join(__dirname, '..', 'plugin', 'controllers', 'views', 'responsive', 'ajax', 'multiepg.tmpl'), 'utf8');
-
-function jumpFunction(name, next) {
-	const start = template.indexOf('function ' + name + '() {');
-	const end = template.indexOf(next, start);
-	assert.ok(start !== -1 && end !== -1);
-	return template.slice(start, end).replace(/^\s*#(?:if|end if).*$/gm, '');
-}
+const jumpConfig = sourceSection('var epgJumpNow = config.jumpNow;', 'function autoJumpTvGuide()');
 
 function runGuide(hour, minute, enabled = true, startHour = 0) {
 	const scroller = {
@@ -39,9 +30,11 @@ function runGuide(hour, minute, enabled = true, startHour = 0) {
 		constructor() { super(2026, 8, 28, hour, minute); }
 		static now() { return new FixedDate().getTime(); }
 	};
-	const context = {jQuery: $, Date: FixedDate, epgJumpNow: enabled, epgJumpActiveService: false};
 	const slotStart = Math.floor(new Date(2026, 8, 28, startHour).getTime() / 1000);
-	vm.runInNewContext(jumpFunction('autoJumpTvGuide', 'function autoJumpTimeline').replace('$slot_start', slotStart), context);
+	const context = runScript(jumpConfig + functionSource('autoJumpTvGuide'), {
+		jQuery: $, Date: FixedDate,
+		config: {day: 0, slotStart, jumpNow: enabled, jumpActiveService: false, currentServiceRef: ''}
+	});
 	context.autoJumpTvGuide();
 	return scroller.position || 0;
 }
@@ -67,8 +60,10 @@ function runTimeline(marker, eventStart, enabled = true) {
 		if (selector === '.epg__channel-col') return {first: () => ({outerWidth: () => 140})};
 		throw new Error('Unexpected selector: ' + selector);
 	};
-	const context = {jQuery: $, epgJumpNow: enabled, epgJumpActiveService: false};
-	vm.runInNewContext(jumpFunction('autoJumpTimeline', 'setTimeout(function() {'), context);
+	const context = runScript(jumpConfig + functionSource('epgTimelineNowPosition') + '\n' + functionSource('autoJumpTimeline'), {
+		jQuery: $, Date: {now: () => 4560000},
+		config: {day: 0, first: 0, jumpNow: enabled, jumpActiveService: false, currentServiceRef: ''}
+	});
 	context.autoJumpTimeline();
 	return scroller.position || 0;
 }
@@ -84,6 +79,10 @@ test('Zeitschrift platziert die Uhrzeit bei 30 % des sichtbaren Zeitbereichs', (
 test('Zeitstrahl platziert die aktuelle Zeit bei 30 % statt am Beginn einer laufenden Sendung', () => {
 	assert.equal(runTimeline(900, 300), 622);
 	assert.equal(runTimeline(900, null), 622);
+});
+
+test('Automatischer Jetzt-Sprung im Zeitstrahl ignoriert eine veraltete Markierung', () => {
+	assert.equal(runTimeline(450, 300), 622);
 });
 
 test('Bei ausgeschalteter Option bleibt die Startposition unverändert', () => {

@@ -2,19 +2,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
+const {functionSource, callbackSource, runScript} = require('./test_epg_source');
 
 const template = fs.readFileSync(path.join(__dirname, '..', 'plugin', 'controllers', 'views', 'responsive', 'ajax', 'multiepg.tmpl'), 'utf8');
 
-function jumpToTime(day, startHour = 0) {
-	const start = template.indexOf('else if (day > 199)');
-	const end = template.indexOf('else if (day > 100)', start);
-	assert.ok(start !== -1 && end !== -1);
-	const branch = template.slice(start, end);
-	const modeStart = branch.indexOf('#if $mode == 1');
-	const modeEnd = branch.indexOf('#else', modeStart);
-	assert.ok(modeStart !== -1 && modeEnd !== -1);
-	const code = branch.slice(modeStart, modeEnd).replace(/^\s*#if.*$/m, '').replaceAll('$slot_start', Math.floor(new Date(2026, 8, 28, startHour).getTime() / 1000));
+function jumpToTime(day, startHour = 0, primeTimeHour = {201: 6, 202: 12, 203: 20}[day]) {
+	const code = callbackSource("scope.find('.plusclick').click(");
 	const scroller = {
 		position: 0,
 		offset: () => ({top: 0}),
@@ -30,7 +23,7 @@ function jumpToTime(day, startHour = 0) {
 		})
 	};
 	const jQuery = selector => {
-		if (typeof selector === 'object') return {data: () => Math.floor(new Date(2026, 8, 28, {201: 6, 202: 12, 203: 20}[day]).getTime() / 1000)};
+		if (typeof selector === 'object') return {data: name => name === 'day' ? day : Math.floor(new Date(2026, 8, 28, primeTimeHour).getTime() / 1000)};
 		if (selector === '#fulltbl') return scroller;
 		if (selector === '#tbl1body tr') return rows;
 		if (selector === '.serviceheader') return {first: () => ({outerHeight: () => 40})};
@@ -39,25 +32,25 @@ function jumpToTime(day, startHour = 0) {
 	const FixedDate = class extends Date {
 		static now() { return new Date(2026, 8, 28, 10, 30).getTime(); }
 	};
-	vm.runInNewContext('function jump(day) { var d = day - 200; ' + code + '} jump(' + day + ');', {jQuery, Date: FixedDate});
+	runScript('(' + code + ').call({});', {
+		jQuery, Date: FixedDate,
+		config: {mode: 1, slotStart: Math.floor(new Date(2026, 8, 28, startHour).getTime() / 1000)}
+	});
 	return scroller.position;
 }
 
-function jumpOnTimeline(day) {
-	const start = template.indexOf('else if (day > 199)');
-	const end = template.indexOf('else if (day > 100)', start);
-	const branch = template.slice(start, end);
-	const modeStart = branch.indexOf('#else');
-	const modeEnd = branch.indexOf('#end if', modeStart);
-	assert.ok(modeStart !== -1 && modeEnd !== -1);
-	const code = branch.slice(modeStart + '#else'.length, modeEnd);
+function jumpOnTimeline(day, now = 37800, first = 0, targetTime = {201: 6, 202: 12, 203: 20}[day] * 3600) {
+	const code = callbackSource("scope.find('.plusclick').click(");
 	const scroller = {animate(value) { this.position = value.scrollLeft; }};
 	const jQuery = selector => {
+		if (typeof selector === 'object') return {data: name => name === 'day' ? day : targetTime};
 		if (selector === '#fulltbl') return scroller;
 		if (selector === '.timetable-now') return {css: () => '450px'};
 		throw new Error('Unexpected selector: ' + selector);
 	};
-	vm.runInNewContext('function jump(day) { var d = day - 200; ' + code + '} jump(' + day + ');', {jQuery});
+	runScript(functionSource('epgTimelineNowPosition') + '\n(' + code + ').call({});', {
+		jQuery, Date: {now: () => now * 1000}, config: {mode: 2, first}
+	});
 	return scroller.position;
 }
 
@@ -85,5 +78,22 @@ test('Zeitschrift begrenzt vergangene Uhrzeiten vor dem ersten EPG-Slot', () => 
 
 test('Zeitstrahl behält seinen horizontalen Uhrzeit-Sprung', () => {
 	assert.equal(jumpOnTimeline(201), 3580);
-	assert.equal(jumpOnTimeline(200), 290);
+	assert.equal(jumpOnTimeline(202), 7180);
+	assert.equal(jumpOnTimeline(203), 11980);
+});
+
+test('Jetzt-Sprung im Zeitstrahl verwendet die aktuelle Uhrzeit statt einer veralteten Markierung', () => {
+	assert.equal(jumpOnTimeline(200), 6280);
+	assert.equal(jumpOnTimeline(200, 37920), 6300);
+	assert.equal(jumpOnTimeline(200, 0), 0);
+});
+
+test('beide Ansichten verwenden den serverseitigen data-time-Wert statt einer festen Primetime', () => {
+	assert.equal(jumpToTime(201, 0, 8), 800);
+	assert.equal(jumpOnTimeline(201, 37800, 0, 8 * 3600), 4780);
+});
+
+test('Zeitstrahl berücksichtigt den konfigurierten Tagesbeginn für Primetime und Jetzt', () => {
+	assert.equal(jumpOnTimeline(202, 37800, 3600), 6580);
+	assert.equal(jumpOnTimeline(200, 37800, 3600), 5680);
 });

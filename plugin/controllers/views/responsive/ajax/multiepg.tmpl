@@ -2,142 +2,18 @@
 #from Plugins.Extensions.OpenWebif.controllers.i18n import tstrings
 #from json import dumps
 #from html import escape
-#from time import localtime, strftime, mktime
-#from Plugins.Extensions.OpenWebif.controllers.views.responsive.ajax.epgdaterange import formatEpgDateRange, getEpgDateLabels
+#from time import localtime, strftime
+#import time as epgClock
+#from Plugins.Extensions.OpenWebif.controllers.views.responsive.ajax.epgdaterange import formatEpgDateRange, getEpgDateLabels, getEpgTimeContext
 #from Plugins.Extensions.OpenWebif.controllers.views.responsive.ajax.renderevtblock import renderEvtBlock
 
-<!-- TODO: move styles to css file -->
-<style>
-	table { font-size: 13px; }
-	tr { vertical-align: top }
-	.float { float:left }
-	.service { font-weight: bold; font-size: 12px; padding-right: 4px; white-space: nowrap; overflow: hidden; }
-	.service img { width:50px; height:30px; float:none; margin-right:10px; border: 0; }
-	.serviceheader { position: sticky; top: 0; z-index: 10; padding: 10px; width: 190px; text-align: center; background-color: #bababa; box-shadow: inset -20px 40px 60px #fff; }
-	.theme--city-lights .serviceheader { background-color: #313443; box-shadow: inset -20px 40px 60px #282c37; }
-	.event { cursor: pointer; width: 190px; overflow:hidden; }
-	.bq { font-size: 12px; padding: 2px 4px; line-height: 18px; cursor: pointer; white-space: nowrap; display: inline-block; margin: 1px 1px 0px 0px;}
-	#bqlist { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto; width: 100%; }
-	#bqlist > li { flex-shrink: 0; }
-	#bqwrap { position: relative; padding-right: 36px; }
-	#bqwrap::after { content: '\276F'; position: absolute; right: 0; top: 0; bottom: 0; width: 36px; display: flex; align-items: center; justify-content: center; background: linear-gradient(to right, transparent, #fff 50%); pointer-events: none; font-weight: bold; font-size: 14px; }
-	#bqwrap.at-end::after { display: none; }
-	.theme--city-lights #bqwrap::after { background: linear-gradient(to right, transparent, #282c37 50%); }
-	#navepg > .nav-tabs { margin-bottom: 0; }
-	#epg-date-range { clear: both; font-size: 18px; line-height: 1.4; margin: 12px 4px; }
-	.plusclick { font-size: 14px; }
-	.navtab-active { cursor: pointer; margin-right:8px; font-weight: bold; border-bottom-width: 2px; border-bottom-style: solid; background-color: transparent !important; bottom: 2px;}
-	.navtab-inactive { cursor: pointer; margin-right:8px; border:None; background-color: transparent !important;  }
-	#epg-calendar-wrap { position: relative; }
-	.epg-calendar__toggle { border: 0; background: transparent; padding: 0 8px 0 0; cursor: pointer; color: inherit; }
-	.epg-calendar__toggle .material-icons { font-size: 20px; vertical-align: middle; }
-	.epg-calendar { display: none; position: absolute; top: 100%; left: 0; z-index: 30; width: 284px; padding: 10px; background: #fff; color: #333; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35); border-radius: 4px; }
-	.theme--city-lights .epg-calendar { background: #282c37; color: #fff; }
-	.theme--neon-blackout .epg-calendar { background: #000; color: #fff; }
-	.epg-calendar__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-	.epg-calendar__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
-	.epg-calendar__grid > span { padding: 5px 0; }
-	.epg-calendar button { border: 0; background: transparent; color: inherit; cursor: pointer; padding: 5px 0; }
-	.epg-calendar__grid button:hover, .epg-calendar__grid button:focus-visible { background: rgba(127, 127, 127, 0.25); }
-	.epg-calendar__grid button.has-epg { font-weight: bold; }
-	.epg-calendar__grid button.is-selected { outline: 2px solid var(--skin-color, #0fb8fb); }
-	#navepg > .nav-tabs.epg-calendar-open { overflow: visible; }
-	.timer { font-weight: bold; font-size: 10px; color:red; }
-	#eventdescription { width: 375px; height: auto; position: fixed; top: 205px; left: 350px; z-index: 100; display: none; overflow: auto; }
-	#navepg { margin-bottom: 1px; }
-	#fulltbl { width: 100%; height: 100%; overflow: auto; }
-	#fulltbl.epg__tv-guide { position: relative; }
-	.epg__tv-guide-now { position: absolute; left: 0; height: 2px; z-index: 5; pointer-events: none; background-color: var(--skin-color, #0fb8fb); opacity: 0.4; display: none; }
-	.epg__tv-guide .epg__event { position: relative; z-index: 6; }
-	.notablemargin { margin: 0px;}
-	.ui-widget-content.nobg , .ui-widget-header.nobg{ background-image: none; } 
-	.wrapper { overflow-x: auto; width: 100%; -ms-overflow-style: -ms-autohiding-scrollbar;}
-	td.border { width: 190px; }
-
-	.epg__event { display: flex; flex-wrap: wrap; padding: 0 0.2em 1em; }
-	.epg__time--start { flex: 0 1 2.8em }
-	.epg__title { font-weight: bold; margin-bottom: 0.2ex; flex: 1 0 0; display: block; }
-	.epg__desc { cursor: pointer; width: 190px; overflow:hidden; max-height: 3.75em; overflow: hidden; line-height: 1.25em; font-size: 12px; text-align: justify; padding-right: 1em; }
-	@supports (-webkit-line-clamp: 4) { .epg__desc { max-height: none; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; } }
-	img[src*="default_picon"] { filter: grayscale(1) opacity(0.5); }
-
-	#fulltbl .table-striped>tbody>tr:hover,
-	#fulltbl .table-striped>tbody>tr:nth-of-type(odd):hover,
-	#fulltbl .theme--city-lights .table-striped>tbody>tr:hover,
-	#fulltbl .theme--city-lights .table-striped>tbody>tr:nth-of-type(odd):hover { 
-	/* background-color: initial; */
-	}
-	.epg__event:hover {
-		filter: brightness(1.2);
-	}
-	.epg__event:hover .epg__title {
-			text-decoration: underline;
-	}
-	.epg__event.event--has-timer {
-    position: relative;
-    overflow: visible;
-	}
-	.timer--record { --epg-timer-marker: #e53935; }
-	.timer--zap { --epg-timer-marker: #1e88e5; }
-	.timer--record-zap { --epg-timer-marker: linear-gradient(to bottom, #e53935 50%, #1e88e5 50%); }
-	.epg__event.event--has-timer::after {
-	content: '';
-    display: block;
-    border-radius: 0;
-    top: -25%;
-    right: 0;
-    bottom: -10%;
-    left: -10px;
-    position: absolute;
-	width: 3px;
-	border: 0;
-	background: var(--epg-timer-marker);
-	pointer-events: none;
-  	}
-	.event--has-timer .epg__timer-marker {
-		position: absolute;
-		top: -25%;
-		bottom: -10%;
-		left: -10px;
-		width: 12px;
-		z-index: 8;
-		padding: 0;
-		border: 0;
-		background: transparent;
-		cursor: alias;
-	}
-	.event--has-timer .epg__timer-marker:focus-visible {
-		outline: 2px solid var(--skin-color, #0fb8fb);
-	}
-	.epg__timer-status .material-icons {
-		font-size: 1.2em;
-    margin-right: 0.6ex;
-    /* margin-bottom: 0.2ex; */
-    vertical-align: text-top;
-    /* line-height: 1.2; */
-    float: left;
-	}
-	.epg__row {
-    border: solid;
-    border-width: 1px 0px 0px 0px;
-    height: 60px !important;
-    margin: 0;
-    box-shadow: 5px 0px 2px -3px rgba(0, 0, 0, 0.2);
-	}
-	.epg__channel {
-    width: 125px !important;
-    margin-left: 15px;
-    padding-right: 18px;
-	}
-	.epg__channel label {
-    font-size: 11px;
-    line-height: 1;
-	}
-</style>
-
+#set $epgTime = $getEpgTimeContext($slot_start)
+#set $first = $epgTime['first']
+#set $now = $epgClock.time()
+#set $epgConfig = {'mode': $mode, 'day': $day, 'week': $week, 'epgmode': $epgmode, 'bref': $quote($bref), 'slotStart': $slot_start, 'first': $first, 'dateLabels': $getEpgDateLabels($tstrings), 'jumpNow': $epg_jump_now, 'jumpActiveService': $epg_jump_active_service, 'currentServiceRef': $current_service_ref}
+<div id="modern-epg" class="modern-epg#if $mode == 2 then ' modern-epg--timeline' else '' #" data-epg-config="$escape($dumps($epgConfig, separators=(',', ':')), quote=True)">
 <div id="navepg">
-#set $epgdate = $localtime($slot_start)
-<ul class="nav nav-tabs tab--skinned" style="margin-top: -10px;height:auto;">
+<ul class="nav nav-tabs tab--skinned">
 <li id="epg-calendar-wrap">
 	<button type="button" id="epg-calendar-toggle" class="epg-calendar__toggle" data-bref="$escape($bref, quote=True)" aria-label="$tstrings['date']" title="$tstrings['date']" aria-expanded="false" aria-controls="epg-calendar-popup"><i class="material-icons" aria-hidden="true">date_range</i></button>
 	<div id="epg-calendar-popup" class="epg-calendar" role="dialog" aria-label="$tstrings['date']">
@@ -152,12 +28,12 @@
 	</div>
 </li>
 #for $slot in list(range(0,7))
-	<li><div class="plusclick navtab-#if $slot==$day then 'active' else 'inactive' #" data-day="$(slot)">$tstrings[("day_" + (time.strftime("%w", time.localtime(time.time()+86400*slot))))]</div></li>
+	<li><div class="plusclick navtab-#if $slot==$day then 'active' else 'inactive' #" data-day="$(slot)">$tstrings['day_%d' % $epgTime['weekdays'][$slot]]</div></li>
 #end for
 <li><div class="plusclick lbl">&nbsp;$tstrings['prime_times']:&nbsp;</div></li>
-<li><div id="pt0" class="plusclick navtab-inactive" data-day="201" data-time="$int($mktime(($epgdate.tm_year, $epgdate.tm_mon, $epgdate.tm_mday, 6, 0, 0, -1, -1, -1)))">06:00</div></li>
-<li><div id="pt1" class="plusclick navtab-inactive" data-day="202" data-time="$int($mktime(($epgdate.tm_year, $epgdate.tm_mon, $epgdate.tm_mday, 12, 0, 0, -1, -1, -1)))">12:00</div></li>
-<li><div id="pt2" class="plusclick navtab-inactive" data-day="203" data-time="$int($mktime(($epgdate.tm_year, $epgdate.tm_mon, $epgdate.tm_mday, 20, 0, 0, -1, -1, -1)))">20:00</div></li>
+<li><div id="pt0" class="plusclick navtab-inactive" data-day="201" data-time="$epgTime['prime_times'][0]">06:00</div></li>
+<li><div id="pt1" class="plusclick navtab-inactive" data-day="202" data-time="$epgTime['prime_times'][1]">12:00</div></li>
+<li><div id="pt2" class="plusclick navtab-inactive" data-day="203" data-time="$epgTime['prime_times'][2]">20:00</div></li>
 #if $day == 0 and $week == 0
 		<li><div id="pt3" class="plusclick navtab-inactive">&nbsp;</div>
 <li><div id="pt4" class="plusclick navtab-active" data-day="200">$tstrings['now']</div></li>
@@ -167,7 +43,7 @@
 <li><div class="plusclick lbl">&nbsp;$tstrings['cw']:&nbsp;</div></li>
 #for $wk in list(range(0,3))
 	#set $w = $wk + 1000
-	<li><div class="plusclick navtab-#if $wk==$week then 'active' else 'inactive' #" data-day="$(w)">$time.strftime("%V",time.localtime(time.time()+604800*wk))</div></li>
+	<li><div class="plusclick navtab-#if $wk==$week then 'active' else 'inactive' #" data-day="$(w)">$epgTime['weeks'][$wk]</div></li>
 #end for
 #end if
 <li><div class=" lbl">&nbsp;$tstrings['display_mode']:&nbsp;</div></li>
@@ -182,125 +58,23 @@
 <div id="epg-date-range">$formatEpgDateRange($slot_start, $tstrings)</div>
 #end if
 <div id="bqwrap">
-<ul id="bqlist" class="nav nav-tabs tab--skinned" style="height:auto;">
+<ul id="bqlist" class="nav nav-tabs tab--skinned">
 #for $bq in $bouquets
 	<li><div class="bq navtab-#if $bq[0]==$bref then 'active' else 'inactive' #" data-ref="$quote($bq[0])">$bq[1]</div></li>
 #end for
 </ul>
 </div>
 </div>
-<script>
-(function() {
-	var list = document.getElementById('bqlist');
-	var wrap = document.getElementById('bqwrap');
-	if (!list || !wrap) return;
-	function update() {
-		wrap.classList.toggle('at-end', list.scrollLeft + list.clientWidth >= list.scrollWidth - 2);
-	}
-	list.addEventListener('scroll', update);
-	update();
-})();
-</script>
-
-#if $mode == 2
-<style>
-	.picon { display: inline-block; margin:0; max-width: 100px;}
-	.picon > img { max-height: 30px;}
-	.timetable { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; border: none; }
-	.timetable-now { position: absolute; top: 0; width: 2px; height: 100%; background-color: #0fb8fb; opacity: 0.4; }
-	.eventlist { display: inline-block; list-style-type: none; margin: 0px; padding: 0px 0px; width: 30000px; }
-	.event { display: block; position: relative; vertical-align: top; clear: left; border: none; }
-	.event.event--has-timer::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--epg-timer-marker); z-index: 7; pointer-events: none; }
-	.event.event--has-timer .epg__timer-marker { top: 0; bottom: 0; left: 0; }
-	.event a,.event > span { padding: 0px; height:58px; width:100%; display: block; white-space: normal; overflow: hidden; }
-	.event a:link:hover { text-decoration: none; }
-	.ename { display: block; width: 100%; padding-left:5px; padding-top:10px; float: left; font-weight: 200; line-height: 1,4; font-size: 14px; }
-	.etime,.etimer  { display: inline-block; padding-left: 5px; font-weight: 200; line-height: 1,4; font-size: 12px; }
-	.event { display: inline-block; border:solid; border-width: 0px 0px 0px 1px; padding: 0px 0px 0px 0px!important; margin:0px 0px 0px -3px!important;}
-	.event .ename,.event .etime,.event .etimer { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.event .ename,.event .etime,.event .etimer { position: relative; z-index: 6; }
-	.epg__timeline-info { display: block; position: relative; z-index: 6; width: max-content; max-width: 100%; }
-	.epg__timeline-info .ename { float: none; }
-	.channel-listing { list-style-type: none;}
-	.curevent { background: #e9e9e9; }
-	.etimesmall, .etime, .ename {
-		color: #000000;
-		text-decoration: none;
-	}
-	.etimesmall, .etime {
-		font-size: 10px;
-	}
-	.epg__timeline-row {
-		display: flex;
-		width: 30140px;
-		min-width: 30140px;
-		height: 60px;
-		border-top: 1px solid rgba(0, 0, 0, 0.08);
-		box-sizing: border-box;
-	}
-	.epg__channel-col {
-		position: sticky;
-		left: 0;
-		cursor: pointer;
-		z-index: 10;
-		width: 140px;
-		min-width: 140px;
-		max-width: 140px;
-		height: 60px;
-		background-color: #bababa;
-		box-shadow: inset -20px 40px 60px #fff, 2px 0px 4px -2px rgba(0, 0, 0, 0.2);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		text-align: center;
-		padding: 4px 8px;
-		flex-shrink: 0;
-		box-sizing: border-box;
-	}
-	.epg__events-col {
-		width: 30000px;
-		height: 60px;
-		flex-shrink: 0;
-	}
-	.theme--city-lights .epg__channel-col {
-		background-color: #313443;
-		box-shadow: inset -20px 40px 60px #282c37, 2px 0px 4px -2px rgba(0, 0, 0, 0.2);
-		color: #f1f1f1;
-	}
-	.theme--city-lights .epg__timeline-row {
-		border-top-color: rgba(255, 255, 255, 0.08);
-	}
-	.theme--city-lights .event a {
-		color: inherit;
-	}
-	.theme--city-lights .event a:hover {
-		color: inherit;
-	}
-	.theme--city-lights .curevent {
-		color: #f1f1f1;
-		background: #313443;
-	}
-	.theme--city-lights .ename,
-	.theme--city-lights .etimesmall, 
-	.theme--city-lights .etime { 
-		color: inherit;
-	}
-</style>
-
-#set $now = $mktime($localtime())
-#set $bt = $localtime($now + ($day * 86400))
-#set $first = $mktime(($bt.tm_year, $bt.tm_mon, $bt.tm_mday, 0, 0, 0, -1, -1, -1))
-#end if
 
 #if $mode == 1
 #set $renderEventBlock = $renderEvtBlock()
-<div id="fulltbl" class="responsive-table epg__tv-guide" style="overflow:auto" data-slot-start="$slot_start" data-refresh-url="ajax/multiepg?bref=$quote($bref)&amp;day=$day&amp;epgmode=$epgmode&amp;week=$week">
+<div id="fulltbl" class="responsive-table epg__tv-guide" data-slot-start="$slot_start" data-refresh-url="ajax/multiepg?bref=$quote($bref)&amp;day=$day&amp;epgmode=$epgmode&amp;week=$week">
 #if $day == 0 and $week == 0
 	<div class="epg__tv-guide-now"></div>
 #end if
 	<table border="0" cellpadding="0" cellspacing="0" width="100%" id="tbl1" class="table table-striped">
 		<thead>
-			<tr id="tbl2body" style="background-color:#bababa;">
+			<tr id="tbl2body">
 #for $sname, $eventlist in $events.items()
 #set $ref = $channelrefs.get($sname, "")
 #set $qref = $quote($ref, safe=' ~@#$()*!+=:;,.?/\'').replace('%253a//','%3a//')
@@ -311,11 +85,10 @@
 			</tr>
 		</thead>
 		<tbody id="tbl1body">
-#set even = 0
 #for $slot in list(range(0,12))
 			<tr>
 	#for $sname, $eventlist in $events.items()
-				<td class="border" style="white-space:normal;">
+				<td class="border">
 		#for $event in $eventlist[$slot]
 			$renderEventBlock.render($event, $tstrings['edit_timer'])
 		#end for
@@ -331,8 +104,8 @@
 </div>
 
 #else
-<div id="fulltbl" class="responsive-table" style="overflow: auto; width: 100%;" data-slot-start="$slot_start" data-first="$first" data-refresh-url="ajax/multiepg?bref=$quote($bref)&amp;day=$day&amp;epgmode=$epgmode&amp;week=$week">
-	<div id="tblinner" style="position: relative; width: 30140px; min-width: 30140px;">
+<div id="fulltbl" class="responsive-table epg__timeline" data-slot-start="$slot_start" data-first="$first" data-refresh-url="ajax/multiepg?bref=$quote($bref)&amp;day=$day&amp;epgmode=$epgmode&amp;week=$week">
+	<div id="tblinner">
 		<div class="timetable">
 			<div class="timetable-now"></div>
 		</div>
@@ -341,9 +114,9 @@
 #set $qref = $quote($ref, safe=' ~@#$()*!+=:;,.?/\'').replace('%253a//','%3a//')
 		<div class="epg__timeline-row epg__row" data-sref="$ref" data-ref="$qref">
 			<div class="epg__channel-col">
-				<div class="epg__channel" style="width: 100% !important; margin: 0; padding: 0; text-align: center;">
-					<div class="picon" style="margin: 0 auto;"><img src="$(picons[$sname])" alt="" loading="lazy" onerror="this.style.display='none'"></div>
-					<label style="display: block; font-size: 11px; line-height: 1.2; margin: 2px 0 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">$(channelnames[$sname])</label>
+				<div class="epg__channel">
+					<div class="picon"><img src="$(picons[$sname])" alt="" loading="lazy" onerror="this.style.display='none'"></div>
+					<label>$(channelnames[$sname])</label>
 				</div>
 			</div>
 			<div class="epg__events-col">
@@ -365,8 +138,7 @@
 			#set pad = ($event.begin_timestamp - $first) / 6
 		#end if
 		#if $pad > 0
-					<li class="event" style="width:${pad}px;border:none;">
-					</li>
+					<li class="event" style="width:${pad}px;border:none;"></li>
 		#end if
 	#end if
 	#set $end = $event.begin_timestamp + $event.duration
@@ -378,10 +150,10 @@
 	#if $event['timer']
 		#set $timerClass = ' event--has-timer timer--' + $event['timer']['markerType']
 	#end if
-					<li class="event$timerClass" data-ref="$ref" data-id="${event.id}" data-begin="${event.begin_timestamp}" data-end="$end" data-toggle="modal" data-target="#EventModal" onclick="if (event.target.closest('.epg__timer-marker')) return; loadeventepg('${event.id}', '$ref');return false;" style="width:${dur/6}px;padding:10px;">
-						<a href="javascript:void(0);" class="ui-widget-content ${iscurr}" title="$event['title']">
+					<li class="event$timerClass" data-ref="$ref" data-id="${event.id}" data-begin="${event.begin_timestamp}" data-end="$end" data-toggle="modal" data-target="#EventModal" onclick="if (event.target.closest('.epg__timer-marker')) return; loadeventepg('${event.id}', '$ref');return false;" style="width:${dur/6}px;">
+						<a href="javascript:void(0);" class="ui-widget-content ${iscurr}" title="$escape($event['title'], quote=True)">
 							<span class="epg__timeline-info">
-								<span class="ename">$event['title']<span class="etimesmall"> ($strftime("%d.%m", $localtime($event['begin_timestamp'])))</span></span>
+								<span class="ename">$escape($event['title'], quote=False)<span class="etimesmall"> ($strftime("%d.%m", $localtime($event['begin_timestamp'])))</span></span>
 								<span class="etime">$strftime("%H:%M", $localtime($event['begin_timestamp'])) - $strftime("%H:%M", $localtime($event['begin_timestamp'] + $event['duration']))</span>
 #if $event['timerStatus'] != ''
 								<span class="etimer $event['timerStatus']">$tstrings['timer']</span>
@@ -401,467 +173,10 @@
 #end for
 	</div>
 </div>
-</div>
-</div>
 #end if
 <div id="eventdescription"></div>
+</div>
 
 <script>
-#if $mode == 2
-var opena = $first;
-var openb = $now;
-var pos = (openb - opena);
-if (pos > 0)
-	pos = pos / 6;
-
-#if $day == 0
-
-jQuery(".timetable-now").css('left', (140 + pos) + 'px');
-
-setTimeout(function() {
-	var nowdate = Math.round(+new Date()/1000);
-	var pos = (nowdate - opena);
-	if(pos > 0)
-		pos = pos / 6;
-	jQuery(".timetable-now").css('left', (140 + pos) + 'px');
-} ,10000);
-
-jQuery(".timetable-now").css('height', jQuery("#tblinner").height());
-#else
-jQuery(".timetable-now").css('height', '0');
-#end if
-
-#end if
-var picons = $dumps($picons);
-var epgDateLabels = $dumps($getEpgDateLabels($tstrings));
-function updateEpgDateRange() {
-	var container = document.getElementById('fulltbl');
-	var label = document.getElementById('epg-date-range');
-	if (!container || !label) return;
-	var bounds = container.getBoundingClientRect();
-	var dates = {};
-	function addDate(timestamp) {
-		if (!isFinite(timestamp)) return;
-		var date = new Date(timestamp * 1000);
-		if (isNaN(date.getTime())) return;
-		var key = date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
-		dates[key] = date;
-	}
-	function visible(rect) {
-		return rect.bottom > bounds.top && rect.top < bounds.bottom && rect.right > bounds.left && rect.left < bounds.right;
-	}
-	if (container.classList.contains('epg__tv-guide')) {
-		var slotStart = Number(container.getAttribute('data-slot-start'));
-		container.querySelectorAll('#tbl1body tr').forEach(function(row, index) {
-			var rect = row.getBoundingClientRect();
-			if (!visible(rect)) return;
-			// Use the row's two-hour slot even when its channel has no EPG events.
-			var startFraction = Math.max(0, (bounds.top - rect.top) / (rect.bottom - rect.top));
-			var endFraction = Math.min(1, (bounds.bottom - rect.top) / (rect.bottom - rect.top));
-			addDate(slotStart + (index + startFraction) * 7200);
-			addDate(slotStart + (index + endFraction) * 7200 - 1);
-			row.querySelectorAll('.epg__event[data-begin]').forEach(function(event) {
-				if (visible(event.getBoundingClientRect())) addDate(Number(event.getAttribute('data-begin')));
-			});
-		});
-	} else {
-		var first = Number(container.getAttribute('data-first'));
-		var start = first + container.scrollLeft * 6;
-		var end = start + Math.max(0, container.clientWidth - 140) * 6 - 1;
-		addDate(start);
-		addDate(end);
-		container.querySelectorAll('.epg__timeline-row').forEach(function(row) {
-			if (!visible(row.getBoundingClientRect())) return;
-			row.querySelectorAll('.eventlist .event[data-begin]').forEach(function(event) {
-				var begin = Number(event.getAttribute('data-begin'));
-				if (begin < start && Number(event.getAttribute('data-end')) > start && visible(event.getBoundingClientRect())) addDate(begin);
-			});
-		});
-	}
-	var days = Object.keys(dates).map(function(key) { return dates[key]; }).sort(function(a, b) { return a - b; });
-	if (!days.length) days = [new Date(Number(container.getAttribute('data-slot-start')) * 1000)];
-	label.textContent = days.map(function(date) {
-		return epgDateLabels.weekdays[date.getDay()] + ', ' + date.getDate() + '.' + epgDateLabels.months[date.getMonth()] + ' ' + date.getFullYear();
-	}).join(' / ');
-}
-function epgKeepVisibleShift(start, end, size, edge) {
-	return Math.max(0, Math.min(edge - start, end - start - size));
-}
-(function() {
-	var container = document.getElementById('fulltbl');
-	var pending = false;
-	function update() {
-		pending = false;
-		if (document.getElementById('fulltbl') !== container) return;
-		var bounds = container.getBoundingClientRect();
-		if (container.classList.contains('epg__tv-guide')) {
-			var header = container.querySelector('.serviceheader');
-			var edge = bounds.top + (header ? header.offsetHeight : 0);
-			container.querySelectorAll('#tbl1body td.border').forEach(function(cell) {
-				var cellBounds = cell.getBoundingClientRect();
-				if (cellBounds.bottom <= edge || cellBounds.top >= bounds.bottom || cellBounds.right <= bounds.left || cellBounds.left >= bounds.right) return;
-				var events = cell.querySelectorAll('.epg__event');
-				events.forEach(function(event, index) {
-					var start = event.getBoundingClientRect().top - (event._epgShift || 0);
-					var next = events[index + 1];
-					var end = next ? next.getBoundingClientRect().top - (next._epgShift || 0) : cellBounds.bottom;
-					var shift = epgKeepVisibleShift(start, end, event.offsetHeight, edge);
-					event.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
-					event._epgShift = shift;
-				});
-			});
-		} else {
-			var channel = container.querySelector('.epg__channel-col');
-			var edge = bounds.left + (channel ? channel.offsetWidth : 0);
-			container.querySelectorAll('.epg__timeline-row').forEach(function(row) {
-				var rowBounds = row.getBoundingClientRect();
-				if (rowBounds.bottom <= bounds.top || rowBounds.top >= bounds.bottom) return;
-				row.querySelectorAll('.eventlist .event[data-begin]').forEach(function(event) {
-					var eventBounds = event.getBoundingClientRect();
-					if (eventBounds.right <= edge || eventBounds.left >= bounds.right) return;
-					var info = event.querySelector('.epg__timeline-info');
-					var start = info.getBoundingClientRect().left - (info._epgShift || 0);
-					var shift = epgKeepVisibleShift(start, eventBounds.right, info.offsetWidth, edge);
-					info.style.transform = shift ? 'translateX(' + shift + 'px)' : '';
-					info._epgShift = shift;
-				});
-			});
-		}
-	}
-	function schedule() {
-		if (!pending) {
-			pending = true;
-			requestAnimationFrame(update);
-		}
-	}
-	container.addEventListener('scroll', schedule);
-	jQuery(window).off('resize.epgKeepVisible').on('resize.epgKeepVisible', schedule);
-	schedule();
-	setTimeout(schedule, 150);
-})();
-var reloadTimers = false;
-function fixTableHeight() {
-	var table = jQuery('#fulltbl');
-	var card = jQuery('#epgcard');
-	if (!table.length || !card.length) return;
-	resizeModernEpgCard();
-	var body = jQuery('#epgcard > .body');
-	var bottomPadding = parseFloat(body.css('padding-bottom')) || 0;
-	table.height(Math.max(140, card[0].getBoundingClientRect().bottom - table[0].getBoundingClientRect().top - bottomPadding));
-	table.width(body.width());
-}
-fixTableHeight();
-updateEpgDateRange();
-jQuery('#fulltbl').on('scroll', updateEpgDateRange);
-
-jQuery(window).off('resize.epgTable').on('resize.epgTable', function(){ fixTableHeight(); updateEpgDateRange(); });
-
-#if $mode == 1 and $day == 0 and $week == 0
-(function() {
-	var marker = jQuery('.epg__tv-guide-now');
-	function updateTvGuideNowMarker() {
-		var rows = jQuery('#tbl1body tr');
-		var elapsed = Date.now() / 1000 - $slot_start;
-		var slotIndex = Math.floor(elapsed / 7200);
-		if (slotIndex < 0 || slotIndex >= rows.length) {
-			marker.hide();
-			return;
-		}
-		var container = jQuery('#fulltbl');
-		var row = rows.eq(slotIndex);
-		var top = row.offset().top - container.offset().top + container.scrollTop() + row.outerHeight() * ((elapsed % 7200) / 7200);
-		marker.css({top: top + 'px', width: jQuery('#tbl1').outerWidth() + 'px'}).show();
-	}
-	updateTvGuideNowMarker();
-	var interval = setInterval(function() {
-		if (!jQuery.contains(document, marker[0])) {
-			clearInterval(interval);
-			jQuery(window).off('resize.epgTvGuideNow', updateTvGuideNowMarker);
-			return;
-		}
-		updateTvGuideNowMarker();
-	}, 10000);
-	jQuery(window).on('resize.epgTvGuideNow', updateTvGuideNowMarker);
-})();
-#end if
-
-jQuery(".bq").click(function() {
-	var id = jQuery(this).data("ref");
-	var epgmode = "$epgmode";
-	jQuery("#tvcontent").html(loadspinner).load('ajax/multiepg?bref='+id +'&day=$day&epgmode=' + epgmode);
-	SetLSValue("lastmbq_"+epgmode,id);
-});
-
-function epgCalendarDayOffset(selected, today) {
-	return Math.round((Date.UTC(selected.getFullYear(), selected.getMonth(), selected.getDate()) -
-		Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000);
-}
-
-(function() {
-	var toggle = jQuery('#epg-calendar-toggle');
-	var popup = jQuery('#epg-calendar-popup');
-	var nav = toggle.closest('.nav-tabs');
-	var grid = jQuery('#epg-calendar-grid');
-	var selected = new Date();
-	selected.setHours(12, 0, 0, 0);
-	selected.setDate(selected.getDate() + $day + $week * 7);
-	var calendarYear = selected.getFullYear();
-	var calendarMonth = selected.getMonth();
-	var bouquet = toggle.attr('data-bref');
-	var available = window.epgCalendarDaysCache || (window.epgCalendarDaysCache = {});
-	var watched = {};
-
-	function loadCalendarDays(year, month) {
-		var key = JSON.stringify([bouquet, year, month]);
-		var entry = available[key];
-		if (!entry) entry = available[key] = {days: null, updated: 0, request: null};
-		if (!entry.request && (!entry.days || Date.now() - entry.updated >= 60000)) {
-			entry.request = jQuery.getJSON('api/epgcalendar?bref=' + encodeURIComponent(bouquet) + '&year=' + year + '&month=' + (month + 1))
-				.done(function(data) {
-					if (data.result) {
-						entry.days = new Set(data.days);
-						entry.updated = Date.now();
-					}
-				}).always(function() { entry.request = null; });
-		}
-		if (entry.request && watched[key] !== entry.request) {
-			watched[key] = entry.request;
-			entry.request.done(function(data) {
-				if (data.result && jQuery.contains(document, popup[0]) && popup.is(':visible') && year === calendarYear && month === calendarMonth) renderCalendar();
-			});
-		}
-		return entry.days;
-	}
-
-	function renderCalendar() {
-		var year = calendarYear;
-		var month = calendarMonth;
-		var days = loadCalendarDays(year, month);
-		jQuery('#epg-calendar-month').text(new Date(year, month, 1).toLocaleDateString(undefined, {month: 'long', year: 'numeric'}));
-		grid.find('button, .epg-calendar__blank').remove();
-		var blanks = (new Date(year, month, 1).getDay() + 6) % 7;
-		for (var gap = 0; gap < blanks; gap++) grid.append('<span class="epg-calendar__blank"></span>');
-		var count = new Date(year, month + 1, 0).getDate();
-		for (var number = 1; number <= count; number++) {
-			var date = new Date(year, month, number);
-			var dayKey = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(number).padStart(2, '0');
-			var button = jQuery('<button type="button"></button>').text(number).attr('title', date.toLocaleDateString()).data('date', date);
-			button.toggleClass('has-epg', !!(days && days.has(dayKey)));
-			button.toggleClass('is-selected', epgCalendarDayOffset(date, selected) === 0);
-			grid.append(button);
-		}
-	}
-
-	toggle.on('click', function(event) {
-		event.stopPropagation();
-		popup.toggle();
-		nav.toggleClass('epg-calendar-open', popup.is(':visible'));
-		toggle.attr('aria-expanded', popup.is(':visible') ? 'true' : 'false');
-		if (popup.is(':visible')) renderCalendar();
-	});
-	jQuery('#epg-calendar-prev, #epg-calendar-next').on('click', function() {
-		var change = this.id === 'epg-calendar-next' ? 1 : -1;
-		var month = new Date(calendarYear, calendarMonth + change, 1);
-		calendarYear = month.getFullYear();
-		calendarMonth = month.getMonth();
-		renderCalendar();
-	});
-	grid.on('click', 'button', function() {
-		var date = jQuery(this).data('date');
-		jQuery('#tvcontent').html(loadspinner).load('ajax/multiepg?bref=' + encodeURIComponent(bouquet) + '&day=' + epgCalendarDayOffset(date, new Date()) + '&epgmode=$epgmode&week=0');
-	});
-	jQuery(document).off('click.epgCalendar keydown.epgCalendar').on('click.epgCalendar', function(event) {
-		if (!jQuery(event.target).closest('#epg-calendar-wrap').length) {
-			popup.hide();
-			nav.removeClass('epg-calendar-open');
-			toggle.attr('aria-expanded', 'false');
-		}
-	}).on('keydown.epgCalendar', function(event) {
-		if (event.key === 'Escape') {
-			popup.hide();
-			nav.removeClass('epg-calendar-open');
-			toggle.attr('aria-expanded', 'false').trigger('focus');
-		}
-	});
-	loadCalendarDays(calendarYear, calendarMonth);
-})();
-
-#if $mode == 1
-jQuery(".service").click(function() {
-	var ref = jQuery(this).data("ref");
-	if (ref != undefined) {
-		zapChannel(ref, '');
-	}
-});
-#else
-jQuery(".epg__channel-col").click(function() {
-	var ref = jQuery(this).closest(".epg__timeline-row").data("ref");
-	if (ref != undefined) {
-		zapChannel(ref, '');
-	}
-});
-#end if
-jQuery(".plusclick").click(function() {
-	var day = jQuery(this).data("day");
-	var epgmode = "$epgmode";
-	if (day != undefined) {
-		if (day > 999)
-		{
-			var w = day - 1000;
-			jQuery("#tvcontent").html(loadspinner).load('ajax/multiepg?bref=${quote($bref)}&day='+$day+'&epgmode='+epgmode+'&week='+w);
-		}
-		else if (day > 199)
-		{
-			var d = day - 200;
-			#if $mode == 1
-			var targetTime = d == 0 ? Date.now() / 1000 : Number(jQuery(this).data('time'));
-			var elapsed = targetTime - $slot_start;
-			var rows = jQuery('#tbl1body tr');
-			var slotIndex = Math.floor(elapsed / 7200);
-			if (slotIndex >= 0 && slotIndex < rows.length) {
-				var container = jQuery('#fulltbl');
-				var row = rows.eq(slotIndex);
-				var headerHeight = jQuery('.serviceheader').first().outerHeight() || 0;
-				var top = row.offset().top - container.offset().top + container.scrollTop() + row.outerHeight() * ((elapsed % 7200) / 7200) - headerHeight;
-				container.animate({scrollTop: Math.max(0, top)}, 500);
-			} else if (slotIndex < 0) {
-				jQuery('#fulltbl').animate({scrollTop: 0}, 500);
-			}
-			#else
-			var pos = 0;
-			if (d == 0 || d == '') {
-				var l = jQuery(".timetable-now").css('left');
-				pos = parseInt(l.replace('px','')) || 0;
-			} else if (d == 1) {
-				pos = 140 + (6 * 3600 / 6);
-			} else if (d == 2) {
-				pos = 140 + (12 * 3600 / 6);
-			} else if (d == 3) {
-				pos = 140 + (20 * 3600 / 6);
-			}
-
-			if (pos > 0) {
-				pos -= 160;
-				jQuery('#fulltbl').animate({scrollLeft: Math.max(0, pos)}, 500);
-			}
-			#end if
-		}
-		else if (day > 100)
-		{
-			var mode = day - 100;
-			if (mode != $mode) {
-				jQuery.ajax({
-				url: 'api/setwebconfig?mepgmode=' + mode,
-					success: function(data) {
-						jQuery("#tvcontent").html(loadspinner).load('ajax/multiepg?bref=${quote($bref)}&day=$day&epgmode='+epgmode+'&week='+$week);
-					}
-				});
-			}
-		}
-		else {
-			jQuery("#tvcontent").html(loadspinner).load('ajax/multiepg?bref=${quote($bref)}&day='+day+'&epgmode='+epgmode+'&week='+$week);
-		}
-	} else {
-		let epgmode = jQuery(this).data("tvradio");
-		if (epgmode != undefined) {
-			jQuery("#tvcontent").html(loadspinner).load('ajax/multiepg?day='+day+'&epgmode='+epgmode);
-		}
-	}
-});
-
-	if (jQuery("#header").is(':hidden')) { 
-		jQuery('#compressmepg').show();
-		jQuery('#refreshmepg2').show();
-	}
-	if (mepgdirect == 1) {
-		mepgdirect=0;
-		jQuery("#expandmepg").click();
-	}
-
-var epgJumpNow = $epg_jump_now;
-var epgJumpActiveService = $epg_jump_active_service;
-var currentServiceRef = "$current_service_ref";
-
-function autoJumpTvGuide() {
-	if (epgJumpActiveService && currentServiceRef) {
-		var normActive = currentServiceRef.trim().toLowerCase().replace(/%3a/g, ':');
-		var targetCol = null;
-		jQuery('#tbl2body td.serviceheader, .serviceheader').each(function() {
-			var sref = (jQuery(this).data('sref') || jQuery(this).data('ref') || jQuery(this).attr('data-sref') || jQuery(this).attr('data-ref') || '').toString().trim().toLowerCase().replace(/%3a/g, ':');
-			if (sref && (sref === normActive || normActive.indexOf(sref) === 0 || sref.indexOf(normActive) === 0)) {
-				targetCol = jQuery(this);
-				return false;
-			}
-		});
-		if (targetCol && targetCol.length) {
-			var scroller = jQuery('#fulltbl');
-			var colPos = targetCol.position();
-			if (colPos) {
-				var targetX = scroller.scrollLeft() + colPos.left - (scroller.width() / 2) + (targetCol.outerWidth() / 2);
-				scroller.scrollLeft(Math.max(0, targetX));
-			}
-		}
-	}
-	#if $day == 0
-	if (epgJumpNow) {
-		var container = jQuery('#fulltbl');
-		if (container.length) {
-			var containerTop = container.offset().top;
-			var containerScroll = container.scrollTop();
-			var headerHeight = jQuery('.serviceheader').first().outerHeight() || 0;
-			var elapsed = Date.now() / 1000 - $slot_start;
-			var slotIndex = Math.floor(elapsed / 7200);
-			if (slotIndex >= 0 && slotIndex < 12) {
-				var targetRow = jQuery('#tbl1body').find('tr').eq(slotIndex);
-				if (targetRow.length) {
-					var timeInSlot = (elapsed - slotIndex * 7200) / 7200;
-					var targetY = targetRow.offset().top - containerTop + containerScroll + targetRow.outerHeight() * timeInSlot - headerHeight - (container.height() - headerHeight) * 0.3;
-					container.scrollTop(Math.max(0, targetY));
-				}
-			}
-		}
-	}
-	#end if
-}
-
-function autoJumpTimeline() {
-	var targetRow = null;
-	if (epgJumpActiveService && currentServiceRef) {
-		var normActive = currentServiceRef.trim().toLowerCase().replace(/%3a/g, ':');
-		jQuery('.epg__row').each(function() {
-			var sref = (jQuery(this).data('sref') || jQuery(this).data('ref') || jQuery(this).attr('data-sref') || jQuery(this).attr('data-ref') || '').toString().trim().toLowerCase().replace(/%3a/g, ':');
-			if (sref && (sref === normActive || normActive.indexOf(sref) === 0 || sref.indexOf(normActive) === 0)) {
-				targetRow = jQuery(this);
-				return false;
-			}
-		});
-		if (targetRow && targetRow.length) {
-			var container = jQuery('#fulltbl');
-			var rowPos = targetRow.position();
-			if (rowPos) {
-				var targetY = container.scrollTop() + rowPos.top - (container.height() / 2) + (targetRow.outerHeight() / 2);
-				container.scrollTop(Math.max(0, targetY));
-			}
-		}
-	}
-	#if $day == 0
-	if (epgJumpNow) {
-		var container = jQuery('#fulltbl');
-		var markerLeft = parseFloat(jQuery('.timetable-now').css('left'));
-		if (!isNaN(markerLeft)) {
-			var channelWidth = jQuery('.epg__channel-col').first().outerWidth() || 0;
-			container.scrollLeft(Math.max(0, markerLeft - channelWidth - (container.width() - channelWidth) * 0.3));
-		}
-	}
-	#end if
-}
-
-setTimeout(function() {
-	#if $mode == 1
-		autoJumpTvGuide();
-	#else
-		autoJumpTimeline();
-	#end if
-	updateEpgDateRange();
-}, 100);
+	ModernEpg.init(JSON.parse(document.getElementById('modern-epg').getAttribute('data-epg-config')));
 </script>

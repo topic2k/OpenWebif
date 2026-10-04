@@ -1310,7 +1310,7 @@ def getMultiEpg(self, ref, begintime=-1, endtime=None, mode=1, modern=False):
 			ev['timerStatus'] = timer['basicStatus'] if timer else ""
 			ev['duration'] = event[6]
 
-			channel = filterName(event[5])
+			channel = event[4] if modern else filterName(event[5])
 
 			if channel not in ret:
 				if mode == 1:
@@ -1319,7 +1319,7 @@ def getMultiEpg(self, ref, begintime=-1, endtime=None, mode=1, modern=False):
 					ret[channel] = [[]]
 
 				picons[channel] = getPicon(event[4])
-				channelnames[channel] = channel
+				channelnames[channel] = filterName(event[5])
 				channelrefs[channel] = event[4]
 
 			if mode == 1:

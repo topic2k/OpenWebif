@@ -18,10 +18,12 @@
 # Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
 ##########################################################################
 
-from os import listdir, stat as osstat, statvfs
-from os.path import join as pathjoin, split as pathsplit, realpath, abspath, isdir, splitext, exists, isfile, normpath
+from os import chmod, fsync, listdir, rename, replace, stat as osstat, statvfs, unlink
+from os.path import join as pathjoin, split as pathsplit, realpath, abspath, isdir, splitext, exists, isfile, lexists, normpath
 
+from stat import S_IMODE
 from struct import Struct
+from tempfile import NamedTemporaryFile
 from time import localtime, time
 from urllib.parse import unquote
 from glob import glob
@@ -375,6 +377,9 @@ def movieAction(session, sref, dirname=None, domove=False, newname=None):
 
 def createActionList(serviceref, dest, newname=None):
 	free = 0
+	if newname is not None and (not isinstance(newname, str) or not newname or newname in ('.', '..')
+			or any(char in newname for char in '/\\\r\n\x00')):
+		raise ValueError("Invalid recording name")
 	if newname is None:
 		try:
 			stat = statvfs(dest)
@@ -391,13 +396,14 @@ def createActionList(serviceref, dest, newname=None):
 		# Move file to itself is allowed, so we have to check it.
 		raise Exception("Refusing to move to the same directory")
 	# Make a list of items to move
-	moveList = [(src, pathjoin(dest, srcName))]
+	destName = srcName
+	if newname:
+		destName = newname if serviceref.flags & eServiceReference.mustDescent else newname + splitext(src)[1]
+	moveList = [(src, pathjoin(dest, destName))]
 	if not serviceref.flags & eServiceReference.mustDescent:
 		# Real movie, add extra files...
 		srcBase, fileext = splitext(src)
 		baseName = pathsplit(srcBase)[1]
-		if newname:
-			baseName = newname
 		suffixes = [".eit", ".jpg", f"{fileext}.cuts", f"{fileext}.meta", ".txt"]
 		if fileext == '.ts':
 			suffixes.extend([".ts.ap", ".ts.sc", ".ts_mp.jpg"])
@@ -406,7 +412,7 @@ def createActionList(serviceref, dest, newname=None):
 			fileName = f"{baseName}{suffix}"
 			candidate = pathjoin(srcPath, fileName)
 			if exists(candidate):
-				moveList.append((candidate, pathjoin(dest, fileName)))
+				moveList.append((candidate, pathjoin(dest, f"{newname}{suffix}" if newname else fileName)))
 
 		size = 0
 		if newname is None:
@@ -422,6 +428,54 @@ def createActionList(serviceref, dest, newname=None):
 	return moveList
 
 
+def _renameRecording(items, newname):
+	tmpname = None
+	moved = []
+	try:
+		for src, dst in items:
+			if src != dst and lexists(dst):
+				raise OSError(f"Destination already exists: {dst}")
+		metafile = next((item for item in items if item[0].endswith(".meta")), None)
+		if metafile is not None:
+			with open(metafile[0], 'rb') as file:
+				lines = file.read().splitlines(keepends=True)
+			if len(lines) < 2:
+				raise ValueError(f"Recording metadata has no title line: {metafile[0]}")
+			title = lines[1].rstrip(b'\r\n')
+			lines[1] = newname.encode('utf-8') + lines[1][len(title):]
+			with NamedTemporaryFile(mode='wb', dir=pathsplit(metafile[0])[0], delete=False) as file:
+				tmpname = file.name
+				file.write(b''.join(lines))
+				file.flush()
+				fsync(file.fileno())
+			chmod(tmpname, S_IMODE(osstat(metafile[0]).st_mode))
+		# Renaming stays in the same directory; do not schedule asynchronous move jobs.
+		for src, dst in items:
+			if src != dst:
+				rename(src, dst)
+				moved.append((src, dst))
+		if tmpname is not None:
+			replace(tmpname, metafile[1])
+			tmpname = None
+	except Exception as err:
+		errors = []
+		for src, dst in reversed(moved):
+			try:
+				if lexists(src):
+					raise OSError(f"Original path already exists: {src}")
+				rename(dst, src)
+			except OSError as rollback_error:
+				errors.append(f"{dst} -> {src}: {rollback_error}")
+		if tmpname is not None:
+			try:
+				unlink(tmpname)
+			except OSError as cleanup_error:
+				errors.append(f"Temporary metadata {tmpname}: {cleanup_error}")
+		if errors:
+			raise OSError(f"Recording rename incomplete: {err}; recovery failed: {'; '.join(errors)}") from err
+		raise
+
+
 def movieActionService(serviceref, dest, name, domove, newname, action):
 	try:
 		items = createActionList(serviceref, dest, newname)
@@ -430,22 +484,10 @@ def movieActionService(serviceref, dest, name, domove, newname, action):
 		if domove:
 			print("movieActionService")
 			print(items)
-			moveFiles(items, name)
-			if newname:
-				metafilename = None
-				for item in items:
-					if item[1].endswith(".meta"):
-						metafilename = item[1]
-						break
-				if metafilename and exists(metafilename):
-					lines = []
-					with open(metafilename) as fd:
-						lines = fd.read().splitlines()
-					lines[1] = newname
-					with open(metafilename, 'w') as fd:
-						lines.append("")
-						lines = "\n".join(lines)
-						fd.write(lines)
+			if newname is not None:
+				_renameRecording(items, newname)
+			else:
+				moveFiles(items, name)
 		else:
 			copyFiles(items, name)
 	except Exception as err:

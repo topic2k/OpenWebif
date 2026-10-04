@@ -433,7 +433,6 @@ def addTimerByEventId(session, eventid, serviceref, justplay, dirname, tags, vps
 
 
 # NEW editTimer function to prevent delete + add on change
-# !!! This new function must be tested !!!!
 # TODO: exception handling
 def editTimer(session, serviceref, begin, end, name, description, disabled, justplay, afterevent, dirname, tags, repeated, channelold, beginold, endold, recordingtype=None, vpsinfo=None, always_zap=-1, pipzap=-1, allow_duplicate=False, marginBefore=-1, marginAfter=-1, hasEndTime=None, returntimer=False):
 	timerObj = None
@@ -442,113 +441,131 @@ def editTimer(session, serviceref, begin, end, name, description, disabled, just
 	for timer in rt.timer_list + rt.processed_timers:
 		needed_ref = ":".join(timer.service_ref.ref.toString().split(":")[:11]) == channelold_str
 		if needed_ref and int(timer.begin) == beginold and int(timer.end) == endold:
-			timer.service_ref = ServiceReference(serviceref)
-			# TODO: start end time check
-			timer.begin = int(float(begin))
-			timer.end = int(float(end))
-			timer.name = name
-			timer.description = description
-			# TODO : EIT
-			# timer.eit = eit
-			timer.disabled = disabled
-			timer.justplay = justplay
-			timer.afterEvent = afterevent
-			timer.dirname = dirname
-			timer.tags = tags
-			timer.repeated = repeated
-			timer.processRepeated()
-			if vpsinfo is not None:
-				timer.vpsplugin_enabled = vpsinfo["vpsplugin_enabled"]
-				timer.vpsplugin_overwrite = vpsinfo["vpsplugin_overwrite"]
-				timer.vpsplugin_time = vpsinfo["vpsplugin_time"]
+			# Preserve receiver objects by reference, but copy the mutable repetition log.
+			timer_states = [(timer, timer.__dict__.copy(), list(getattr(timer, "log_entries", [])))]
+			changed_timers = []
+			accepted = False
+			try:
+				timer.service_ref = ServiceReference(serviceref)
+				# TODO: start end time check
+				timer.begin = int(float(begin))
+				timer.end = int(float(end))
+				timer.name = name
+				timer.description = description
+				# TODO : EIT
+				# timer.eit = eit
+				timer.disabled = disabled
+				timer.justplay = justplay
+				timer.afterEvent = afterevent
+				timer.dirname = dirname
+				timer.tags = tags
+				timer.repeated = repeated
+				timer.processRepeated()
+				if vpsinfo is not None:
+					timer.vpsplugin_enabled = vpsinfo["vpsplugin_enabled"]
+					timer.vpsplugin_overwrite = vpsinfo["vpsplugin_overwrite"]
+					timer.vpsplugin_time = vpsinfo["vpsplugin_time"]
 
-			if always_zap != -1:
-				if hasattr(timer, "always_zap"):
-					timer.always_zap = always_zap == 1
-				if hasattr(timer, "zapbeforerecord"):
-					timer.zapbeforerecord = always_zap == 1
+				if always_zap != -1:
+					if hasattr(timer, "always_zap"):
+						timer.always_zap = always_zap == 1
+					if hasattr(timer, "zapbeforerecord"):
+						timer.zapbeforerecord = always_zap == 1
 
-			if pipzap != -1 and hasattr(timer, "pipzap"):
-				timer.pipzap = pipzap == 1
+				if pipzap != -1 and hasattr(timer, "pipzap"):
+					timer.pipzap = pipzap == 1
 
-			if hasattr(timer, "allow_duplicate"):
-				timer.allow_duplicate = allow_duplicate
+				if hasattr(timer, "allow_duplicate"):
+					timer.allow_duplicate = allow_duplicate
 
-			if recordingtype:
-				timer.descramble = {
-					"normal": True,
-					"descrambled": True,
-					"scrambled": False,
-					}[recordingtype]
-				timer.record_ecm = {
-					"normal": False,
-					"descrambled": True,
-					"scrambled": True,
-					}[recordingtype]
+				if recordingtype:
+					timer.descramble = {
+						"normal": True,
+						"descrambled": True,
+						"scrambled": False,
+						}[recordingtype]
+					timer.record_ecm = {
+						"normal": False,
+						"descrambled": True,
+						"scrambled": True,
+						}[recordingtype]
 
-			if getInfo()['timermargins']:
-				if marginBefore != -1:
-					timer.marginBefore = int(marginBefore * 60)
-					timer.eventBegin = timer.begin + timer.marginBefore
-				if marginAfter != -1:
-					timer.marginAfter = int(marginAfter * 60)
-					timer.eventEnd = timer.end - timer.marginAfter
-				if hasEndTime is not None:
-					timer.hasEndTime = hasEndTime
-					if justplay and not hasEndTime:
-						timer.end = timer.begin
-						timer.eventEnd = timer.end
+				if getInfo()['timermargins']:
+					if marginBefore != -1:
+						timer.marginBefore = int(marginBefore * 60)
+						timer.eventBegin = timer.begin + timer.marginBefore
+					if marginAfter != -1:
+						timer.marginAfter = int(marginAfter * 60)
+						timer.eventEnd = timer.end - timer.marginAfter
+					if hasEndTime is not None:
+						timer.hasEndTime = hasEndTime
+						if justplay and not hasEndTime:
+							timer.end = timer.begin
+							timer.eventEnd = timer.end
 
-			if returntimer:
-				timerObj = getTimerObj(timer, "")
+				if returntimer:
+					timerObj = getTimerObj(timer, "")
 
-			# TODO: multi tuner test
-			sanity = TimerSanityCheck(rt.timer_list, timer)
-			conflicts = None
-			if not sanity.check():
-				conflicts = sanity.getSimulTimerList()
-				if conflicts is not None:
-					for conflict in conflicts:
-						if conflict.setAutoincreaseEnd(timer):
-							rt.timeChanged(conflict)
-							if not sanity.check():
-								conflicts = sanity.getSimulTimerList()
-			if conflicts is None:
-				rt.timeChanged(timer)
-				if timerObj:
-					timerObj["channelold"] = channelold_str
-					timerObj["beginold"] = beginold
-					timerObj["endold"] = endold
-					return {
-						"result": True,
-						"message": _("Timer '%s' changed") % name,
-						"timer": timerObj
-					}
+				# TODO: multi tuner test
+				sanity = TimerSanityCheck(rt.timer_list, timer)
+				conflicts = None
+				if not sanity.check():
+					conflicts = sanity.getSimulTimerList()
+					if conflicts is not None:
+						for conflict in conflicts:
+							if conflict is timer:
+								continue
+							timer_states.append((conflict, conflict.__dict__.copy(), list(getattr(conflict, "log_entries", []))))
+							if conflict.setAutoincreaseEnd(timer):
+								changed_timers.append(conflict)
+						if changed_timers:
+							conflicts = None if sanity.check() else sanity.getSimulTimerList()
+				if conflicts is None:
+					accepted = True
+					for conflict in changed_timers:
+						rt.timeChanged(conflict)
+					rt.timeChanged(timer)
+					if timerObj:
+						timerObj["channelold"] = channelold_str
+						timerObj["beginold"] = beginold
+						timerObj["endold"] = endold
+						return {
+							"result": True,
+							"message": _("Timer '%s' changed") % name,
+							"timer": timerObj
+						}
+					else:
+						return {
+							"result": True,
+							"message": _("Timer '%s' changed") % name
+						}
 				else:
-					return {
-						"result": True,
-						"message": _("Timer '%s' changed") % name
-					}
-			else:
-				errors = []
-				conflictinfo = []
-				for conflict in conflicts:
-					errors.append(conflict.name)
-					conflictinfo.append({
-						"serviceref": str(conflict.service_ref),
-						"servicename": removeBad(conflict.service_ref.getServiceName()),
-						"name": conflict.name,
-						"begin": conflict.begin,
-						"end": conflict.end,
-						"realbegin": strftime(_("%d.%m.%Y %H:%M"), (localtime(float(conflict.begin)))),
-						"realend": strftime(_("%d.%m.%Y %H:%M"), (localtime(float(conflict.end))))
-					})
+					errors = []
+					conflictinfo = []
+					for conflict in conflicts:
+						errors.append(conflict.name)
+						conflictinfo.append({
+							"serviceref": str(conflict.service_ref),
+							"servicename": removeBad(conflict.service_ref.getServiceName()),
+							"name": conflict.name,
+							"begin": conflict.begin,
+							"end": conflict.end,
+							"realbegin": strftime(_("%d.%m.%Y %H:%M"), (localtime(float(conflict.begin)))),
+							"realend": strftime(_("%d.%m.%Y %H:%M"), (localtime(float(conflict.end))))
+						})
 
-				return {
-					"result": False,
-					"message": _("Timer '%s' not saved while Conflict") % name,
-					"conflicts": conflictinfo
-				}
+					return {
+						"result": False,
+						"message": _("Timer '%s' not saved while Conflict") % name,
+						"conflicts": conflictinfo
+					}
+			finally:
+				if not accepted:
+					for entry, state, log_entries in reversed(timer_states):
+						if "log_entries" in state:
+							state["log_entries"][:] = log_entries
+						entry.__dict__.clear()
+						entry.__dict__.update(state)
 
 	return {
 		"result": False,
