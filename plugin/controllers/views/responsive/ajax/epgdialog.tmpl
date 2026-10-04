@@ -71,7 +71,7 @@
 					<div class="col-xs-12 collapse" id="evenid$dataid">
 					<p>$event.shortdesc</p>
 					<p>
-					$event.longdesc.replace('\n',r'<br/>').replace('\8a',r'<br/>')
+					$event.longdesc.replace('\n',r'<br/>').replace(r'\8a',r'<br/>')
 					</p>
 				</div>
 			</div>
@@ -130,7 +130,7 @@
 						<p>$event.shortdesc</p>
 						<i class="material-icons material-icons-centered">expand_more</i></span>
 						<div class="collapse" id="evenid$dataid">
-						<p>$event.longdesc.replace('\n',r'<br/>').replace('\8a',r'<br/>')</p>
+						<p>$event.longdesc.replace('\n',r'<br/>').replace(r'\8a',r'<br/>')</p>
 						</div>
 						#else
 						<span><p>$event.shortdesc</p></span>

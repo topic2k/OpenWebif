@@ -75,6 +75,16 @@
 #set $tname=quote($timer.name)
 #set $metadata = $dumps({ 'sref': quote($timer.serviceref), 'begin': $timer.begin, 'end': $timer.end }, indent=None, separators=(",", ":"))
 #set $rowClass = 'row row-striped clearfix pad-top-15' if $isSettingEnabled('mintimerlist') == 'checked' else ''
+#set $beginLocal = localtime($timer.begin)
+#set $endLocal = localtime($timer.end)
+#set $beginDisplay = $tstrings['day_' + strftime('%w', $beginLocal)] + ', ' + $timer.realbegin
+#if $beginLocal[:3] == $endLocal[:3]
+#set $endDisplay = strftime('%H:%M', $endLocal)
+#set $rangeSeparator = '-'
+#else
+#set $endDisplay = $tstrings['day_' + strftime('%w', $endLocal)] + ', ' + $timer.realend
+#set $rangeSeparator = ' - '
+#end if
 
 #filter None
 <div class="list-tag-filter-item $rowClass" id="$timer.begin-$timer.end" data-filter-tags="$escape($timer.tags or '', quote=True)" data-metadata="$escape($metadata, quote=True)">
@@ -93,8 +103,7 @@
 	<div class="list-tag-item-tags"></div>
 	</div>
 	<div class="col-xs-12 col-md-3">
-	<b>$tstrings[("day_" + (time.strftime("%w", time.localtime($timer.begin))))]</b>
-	<time>$timer.realbegin</time> - <time>$timer.realend</time>
+	<time>$beginDisplay</time>$rangeSeparator<time>$endDisplay</time>
 	<b>
 	#if $timer.disabled
 		$tstrings['disabled']
@@ -184,9 +193,9 @@
 	<div class="body">
 		<div class="row clearfix m-b--20">
 			<div class="col-sm-4">
-				<time style="white-space: nowrap;">$timer.realbegin</time>
+				<time style="white-space: nowrap;">$beginDisplay</time>#slurp
 			#if $timer.justplay != 1:
-				 - <time style="white-space: nowrap;">$timer.realend</time>
+$rangeSeparator<time style="white-space: nowrap;">$endDisplay</time>
 				 <span class="event__duration" style="opacity: 0.4; margin-left: 0.4ch;">($int($timer.duration / 60) $tstrings['mins'])</span>
 			#end if
 			#if $timer.repeated != 0
