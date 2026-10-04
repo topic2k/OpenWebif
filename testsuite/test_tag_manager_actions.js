@@ -69,7 +69,7 @@ function setup() {
 		0: {}, length: 1,
 		attr: name => ({'data-error': 'Fehler', 'data-invalid': 'Ungültiges Stichwort',
 			'data-usage-unknown': 'Unbekannt', 'data-not-used': 'Nicht verwendet', 'data-label-timers': 'Timer',
-			'data-label-recordings': 'Aufnahmen', 'data-label-autotimers': 'AutoTimer-Liste',
+			'data-label-recordings': 'Aufnahmen', 'data-label-autotimers': 'AutoTimer',
 			'data-edit-title': 'Bearbeiten', 'data-delete-title': 'Löschen'})[name],
 		find(selector) {
 			const elements = {
@@ -160,13 +160,13 @@ for (const [selector, data] of [
 			assert.equal(state.rows.length, 2);
 			assert.equal(state.rows[1].attr('data-tag'), 'Neu');
 			assert.equal(state.rows[1].find('.tagmanager-label').text(), 'Neu');
-			assert.equal(state.rows[1].find('.tagmanager-usage').text(), 'Timer: 2AutoTimer-Liste: 1');
+			assert.equal(state.rows[1].find('.tagmanager-usage').text(), 'Timer: 2AutoTimer: 1');
 			assert.equal(state.rows[1].find('.tagmanager-edit').attr('title'), 'Bearbeiten');
 			assert.equal(state.name, '');
 		} else if (data.action === 'rename') {
 			assert.equal(state.rows.length, 1);
 			assert.equal(state.row.attr('data-tag'), 'Umbenannt');
-			assert.equal(state.row.find('.tagmanager-usage').text(), 'Timer: 2AutoTimer-Liste: 1');
+			assert.equal(state.row.find('.tagmanager-usage').text(), 'Timer: 2AutoTimer: 1');
 		} else {
 			assert.equal(state.rows.length, 0);
 			assert.deepEqual(state.modalCalls, ['show', 'hide']);
@@ -217,7 +217,7 @@ test('Übernehmen + Verwendungen anpassen aktualisiert Zuordnungen nur auf ausdr
 	state.requests[0].resolve({result: true, usage: {timers: 2, movies: 1, autotimers: 1}});
 	state.requests[0].finish();
 	assert.deepEqual(state.modalCalls, ['show', 'hide']);
-	assert.equal(state.rows[0].find('.tagmanager-usage').text(), 'Timer: 2Aufnahmen: 1AutoTimer-Liste: 1');
+	assert.equal(state.rows[0].find('.tagmanager-usage').text(), 'Timer: 2Aufnahmen: 1AutoTimer: 1');
 	assert.equal(state.tag, 'Mit_Leerzeichen');
 	assert.deepEqual(state.reloads, []);
 });

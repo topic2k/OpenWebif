@@ -353,7 +353,7 @@ msgstr "AutoTimer-Einstellungen"
 
 #: ../plugin/controllers/base.py:345 ../plugin/controllers/i18n.py:307
 msgid "AutoTimers"
-msgstr "AutoTimer-Liste"
+msgstr "AutoTimer"
 
 #: ../plugin/controllers/i18n.py:266
 msgid "Autotimer Preview"
