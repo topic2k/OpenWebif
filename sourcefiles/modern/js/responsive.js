@@ -34,6 +34,7 @@ function initListTagFilter(kind) {
 	const chips = host.querySelector('.list-tag-filter-chips');
 	const count = host.querySelector('.list-tag-filter-count');
 	const selected = listTagFilterSelections[kind];
+	const list = host.closest?.('.movies-card') || host.parentElement;
 	let known = [];
 	let used = [];
 
@@ -43,7 +44,7 @@ function initListTagFilter(kind) {
 
 	function render() {
 		let matches = 0;
-		host.parentElement.querySelectorAll('.list-tag-filter-item').forEach(item => {
+		list.querySelectorAll('.list-tag-filter-item').forEach(item => {
 			const tags = itemTags(item);
 			item.hidden = !tagFilterMatches(tags, selected);
 			if (!item.hidden) matches++;
@@ -80,7 +81,7 @@ function initListTagFilter(kind) {
 
 	function renderOptions() {
 		options.replaceChildren();
-		const localTags = [...new Set(Array.from(host.parentElement.querySelectorAll('.list-tag-filter-item')).flatMap(itemTags))];
+		const localTags = [...new Set(Array.from(list.querySelectorAll('.list-tag-filter-item')).flatMap(itemTags))];
 		const groups = [[host.dataset.known, known], [host.dataset.used, [...new Set(used.concat(localTags, selected))].filter(tag => !known.includes(tag)).sort()]];
 		groups.forEach(([title, tags]) => {
 			if (!tags.length) return;

@@ -38,6 +38,53 @@ test('Alle modernen Listen bieten Tag-Auswahl ohne Freitext und verwenden ihre e
 	assert.match(script, /fetch\(owifRequestUrl\('\/api\/tagfiltertags'\)\)/);
 });
 
+test('Aufnahmen-Kopf, Filter und Verzeichnispfad bleiben über der scrollenden Liste sichtbar', () => {
+	const movieTemplate = templates[0];
+	const sticky = movieTemplate.indexOf('class="movies-sticky"');
+	const filter = movieTemplate.indexOf('id="tag-filter-movies"');
+	const directory = movieTemplate.indexOf('id="moviedirbtn"');
+	const recordings = movieTemplate.indexOf('#for $movie in $movies');
+	assert.ok(sticky !== -1 && sticky < filter && filter < directory && directory < recordings);
+	assert.match(movieTemplate, /\.movies-sticky\s*\{[^}]*position:\s*sticky;[^}]*top:\s*70px;/);
+	assert.match(movieTemplate, /@media\s*\(min-width:\s*1170px\)\s*\{\s*\.movies-sticky\s*\{\s*top:\s*100px;/);
+	assert.match(movieTemplate, /\.movies-sticky::before\s*\{[^}]*height:\s*100px;[^}]*background:\s*var\(--background-color--main,\s*#e9e9e9\);/);
+	assert.match(movieTemplate, /\.movies-card\s*\{[^}]*box-shadow:\s*none;/);
+	assert.match(movieTemplate, /@media\s*\(max-width:\s*767px\)\s*\{\s*\.movies-sticky\s*\{\s*top:\s*0;/);
+	assert.match(movieTemplate, /\.movies-sticky \.body\s*\{[^}]*padding-bottom:\s*10px;/);
+	assert.match(script, /host\.closest\?\.\('\.movies-card'\) \|\| host\.parentElement/);
+});
+
+test('Der Aufnahmen-Filter erreicht Listeneinträge außerhalb seines Sticky-Bereichs', async () => {
+	const item = {dataset: {filterTags: 'Krimi'}, hidden: true, querySelector: () => null};
+	const card = {querySelectorAll: () => [item]};
+	const makeNode = () => ({children: [], replaceChildren() { this.children = []; }, appendChild(child) { this.children.push(child); }, append(...children) { this.children.push(...children); }});
+	const options = makeNode();
+	const count = {textContent: ''};
+	const panel = {hidden: true};
+	const toggle = {classList: {toggle() {}}, querySelector: () => null, setAttribute() {}};
+	const host = {
+		dataset: {known: 'Bekannt', used: 'Verwendet', matches: '%d Treffer'},
+		isConnected: true,
+		closest: selector => selector === '.movies-card' ? card : null,
+		parentElement: {querySelectorAll: () => []},
+		querySelector: selector => ({'.list-tag-filter-panel': panel, '.list-tag-filter-options': options, '.list-tag-filter-selection': {hidden: true}, '.list-tag-filter-chips': makeNode(), '.list-tag-filter-count': count, '.list-tag-filter-clear': {}})[selector]
+	};
+	const document = {
+		getElementById: () => host,
+		querySelector: () => toggle,
+		addEventListener() {},
+		createElement: () => makeNode(),
+		createTextNode: text => ({textContent: text})
+	};
+	const context = {document, owifRequestUrl: url => url, fetch: async () => ({ok: true, json: async () => ({known: [], used: []})})};
+	vm.runInNewContext(script.slice(script.indexOf('var listTagFilterSelections'), script.indexOf('$(function ()')), context);
+	context.initListTagFilter('movies');
+	assert.equal(item.hidden, false);
+	assert.equal(count.textContent, '1 Treffer');
+	await toggle.onclick();
+	assert.equal(options.children[1].children[0].value, 'Krimi');
+});
+
 test('Die drei Filter-Buttons zeigen ausschließlich das zustandsabhängige Icon', () => {
 	for (const template of templates) {
 		const button = template.match(/<button[^>]+class="list-tag-filter-toggle"[^>]*>[\s\S]*?<\/button>/);

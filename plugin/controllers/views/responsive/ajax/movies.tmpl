@@ -4,37 +4,77 @@
 #from Plugins.Extensions.OpenWebif.controllers.i18n import tstrings
 #from Plugins.Extensions.OpenWebif.controllers.defaults import isSettingEnabled
 
+<style>
+	.movies-card {
+		box-shadow: none;
+	}
+	.movies-sticky {
+		position: sticky;
+		top: 70px;
+		z-index: 10;
+		background: inherit;
+		border-bottom: 1px solid rgba(204, 204, 204, 0.35);
+	}
+	.movies-sticky .body {
+		padding-bottom: 10px;
+	}
+	.movies-sticky nav {
+		margin-left: 15px;
+	}
+	body:not(.theme--supabright) .movies-sticky {
+		border-bottom-color: var(--background-color--hover);
+	}
+	@media (min-width: 1170px) {
+		.movies-sticky {
+			top: 100px;
+		}
+		.movies-sticky::before {
+			content: "";
+			position: absolute;
+			bottom: 100%;
+			left: 0;
+			right: 0;
+			height: 100px;
+			background: var(--background-color--main, #e9e9e9);
+		}
+	}
+	@media (max-width: 767px) {
+		.movies-sticky {
+			top: 0;
+		}
+	}
+</style>
+
 <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
-	<div class="card">
-		<div class="header">
-			<div class="row clearfix">
-				<div class="col-xs-12 col-sm-6">
-					<h2><i class="material-icons material-icons-centered">movie</i>$tstrings['movies']</h2>
+	<div class="card movies-card">
+		<div class="movies-sticky">
+			<div class="header">
+				<div class="row clearfix">
+					<div class="col-xs-12 col-sm-6">
+						<h2><i class="material-icons material-icons-centered">movie</i>$tstrings['movies']</h2>
+					</div>
 				</div>
+				<ul class="header-dropdown list-tag-filter-toolbar">
+					<li><button type="button" class="list-tag-filter-toggle" data-tag-filter-toggle="movies" title="$tstrings['tag_filter_title']" aria-label="$tstrings['tag_filter_title']" aria-expanded="false"><svg class="list-tag-filter-icon--off" data-icon="ic:round-filter-alt-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.79 5.61A.998.998 0 0 0 19 4H6.83l7.97 7.97zm.7 14.88L3.51 3.51A.996.996 0 1 0 2.1 4.92L10 13v5c0 1.1.9 2 2 2s2-.9 2-2v-1.17l5.07 5.07c.39.39 1.02.39 1.41 0s.4-1.02.01-1.41"/></svg><svg class="list-tag-filter-icon--on" data-icon="ic:round-filter-alt" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M4.25 5.61C6.57 8.59 10 13 10 13v5c0 1.1.9 2 2 2s2-.9 2-2v-5s3.43-4.41 5.75-7.39c.51-.66.04-1.61-.8-1.61H5.04c-.83 0-1.3.95-.79 1.61"/></svg></button></li>
+					<li><a href="#movies"><i class="material-icons">autorenew</i></a></li>
+					<li class="dropdown">
+						<a href="javascript:void(0);" class="dropdown-toggle m-l-5 m-r-5" title="$tstrings['sort']" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false"><i class="material-icons">sort</i></a>
+						<ul class="dropdown-menu pull-right" id="timerbuttons">
+							<li><a href="javascript:void(0);" onclick="changeMoviesort('name'); return false;"><i class="material-icons material-icons-centered">vertical_align_bottom</i>$tstrings['name_asc']</a></li>
+							<li><a href="javascript:void(0);" onclick="changeMoviesort('named'); return false;"><i class="material-icons material-icons-centered">vertical_align_top</i>$tstrings['name_desc']</a></li>
+							<li><a href="javascript:void(0);" onclick="changeMoviesort('date'); return false;"><i class="material-icons material-icons-centered">vertical_align_bottom</i>$tstrings['date_asc']</a></li>
+							<li><a href="javascript:void(0);" onclick="changeMoviesort('dated'); return false;"><i class="material-icons material-icons-centered">vertical_align_top</i>$tstrings['date_desc']</a></li>
+						</ul>
+					</li>
+				</ul>
 			</div>
-			<ul class="header-dropdown list-tag-filter-toolbar">
-				<li><button type="button" class="list-tag-filter-toggle" data-tag-filter-toggle="movies" title="$tstrings['tag_filter_title']" aria-label="$tstrings['tag_filter_title']" aria-expanded="false"><svg class="list-tag-filter-icon--off" data-icon="ic:round-filter-alt-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.79 5.61A.998.998 0 0 0 19 4H6.83l7.97 7.97zm.7 14.88L3.51 3.51A.996.996 0 1 0 2.1 4.92L10 13v5c0 1.1.9 2 2 2s2-.9 2-2v-1.17l5.07 5.07c.39.39 1.02.39 1.41 0s.4-1.02.01-1.41"/></svg><svg class="list-tag-filter-icon--on" data-icon="ic:round-filter-alt" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M4.25 5.61C6.57 8.59 10 13 10 13v5c0 1.1.9 2 2 2s2-.9 2-2v-5s3.43-4.41 5.75-7.39c.51-.66.04-1.61-.8-1.61H5.04c-.83 0-1.3.95-.79 1.61"/></svg></button></li>
-				<li><a href="#movies"><i class="material-icons">autorenew</i></a></li>
-				<li class="dropdown">
-				<a href="javascript:void(0);" class="dropdown-toggle m-l-5 m-r-5" title="$tstrings['sort']" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false"><i class="material-icons">sort</i></a>
-					<ul class="dropdown-menu pull-right" id="timerbuttons">
-						<li><a href="javascript:void(0);" onclick="changeMoviesort('name'); return false;"><i class="material-icons material-icons-centered">vertical_align_bottom</i>$tstrings['name_asc']</a></li>
-						<li><a href="javascript:void(0);" onclick="changeMoviesort('named'); return false;"><i class="material-icons material-icons-centered">vertical_align_top</i>$tstrings['name_desc']</a></li>
-						<li><a href="javascript:void(0);" onclick="changeMoviesort('date'); return false;"><i class="material-icons material-icons-centered">vertical_align_bottom</i>$tstrings['date_asc']</a></li>
-						<li><a href="javascript:void(0);" onclick="changeMoviesort('dated'); return false;"><i class="material-icons material-icons-centered">vertical_align_top</i>$tstrings['date_desc']</a></li>
-					</ul>
-				</li>
-			</ul>
-		</div>
-		<div class="body">
-			<div id="tag-filter-movies" class="list-tag-filter" data-list="movies" data-known="$tstrings['known_tags']" data-used="$tstrings['tag_filter_used']" data-clear="$tstrings['tag_filter_clear']" data-matches="$tstrings['tag_filter_matches']" data-error="$tstrings['tag_filter_error']">
-				<div class="list-tag-filter-panel" hidden><div class="list-tag-filter-options"></div></div>
-				<div class="list-tag-filter-selection" hidden><span class="list-tag-filter-chips"></span><button type="button" class="btn btn-default list-tag-filter-clear">$tstrings['tag_filter_clear']</button><span class="list-tag-filter-count"></span></div>
-			</div>
-			<div id="content_main">
-				<div id="tvcontentmain">
-					<div class="row clearfix m-l-20 m-b-20">
-						<nav>
+			<div class="body">
+				<div id="tag-filter-movies" class="list-tag-filter" data-list="movies" data-known="$tstrings['known_tags']" data-used="$tstrings['tag_filter_used']" data-clear="$tstrings['tag_filter_clear']" data-matches="$tstrings['tag_filter_matches']" data-error="$tstrings['tag_filter_error']">
+					<div class="list-tag-filter-panel" hidden><div class="list-tag-filter-options"></div></div>
+					<div class="list-tag-filter-selection" hidden><span class="list-tag-filter-chips"></span><button type="button" class="btn btn-default list-tag-filter-clear">$tstrings['tag_filter_clear']</button><span class="list-tag-filter-count"></span></div>
+				</div>
+				<div class="row clearfix m-l-20">
+					<nav>
 #set $path=''
 #set $dirs = $directory[0:].split("/")[1:-1]
 #set $dirDepth = len($dirs)
@@ -70,8 +110,13 @@
 								</select>
 							</span>
 #end if
-						</nav>
-					</div>
+					</nav>
+				</div>
+			</div>
+		</div>
+		<div class="body">
+			<div id="content_main">
+				<div id="tvcontentmain">
 					#set $count = 0
 					#for $movie in $movies
 					#set $mname = $movie.eventname.replace("\"", r"'")
