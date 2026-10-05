@@ -29,6 +29,12 @@ python -m unittest discover -s testsuite/integration -p 'test_*.py' -v
 
 Die schnellen bestehenden Testläufe bleiben unverändert und benötigen keinen Browser. Fehlende Browserabhängigkeiten werden im separaten Integrationstest als Fehler gemeldet, nicht übersprungen.
 
+## Moderne Aufnahmensuche
+
+`test_movie_search.py` prüft den Suchcontroller sowie die gerenderten Vorlagen `movies.tmpl` und `moviesearch.tmpl`; `test_modern_movie_view.js` prüft Such-URLs und das Erhalten von Ordner, Ansicht und Suchbegriff. Abgedeckt sind Titel und Beschreibungen, Unterordner, Sortierung, Unicode/Sonderzeichen, leere Suche und fehlende Treffer sowie beide Suchergebnis-Darstellungen.
+
+Mit den oben genannten Browserabhängigkeiten prüft `python -m unittest testsuite.integration.test_modern_movie_search -v` zusätzlich Button/Enter, Aktualisieren, Sortieren, Tagfilter und Zurücksetzen auf Desktop und Mobilgeräten. Dabei werden vollständige Cheetah-Vorlagen und die ausgelieferte Datei `plugin/public/modern/js/responsive.min.js` verwendet; sämtliche Browseranfragen bleiben in lokalen Fixtures. Dieser Test ist auch im separaten Integrationstestlauf enthalten.
+
 ## Neustart-Anzeige im Browser
 
 Mit denselben Browserabhängigkeiten prüft `node --test testsuite/integration/reboot_card_browser_tests.js` die Neustart-Karte mit produktiven Styles und Anzeige-Funktionen in drei Themes und drei Bildschirmgrößen, einschließlich langer Hinweise. Der Test arbeitet mit einer lokalen Testseite und blockiert sämtliche Netzwerkanfragen; ein Receiver wird nicht neu gestartet.

@@ -50,3 +50,40 @@ test('Liste und Ordneransicht behalten den gewählten Ordner bei Navigation und 
 	context.toggleMoviesView();
 	assert.equal(url, context.moviesViewUrl(button.dataset.directory, false));
 });
+
+test('Aufnahmensuche kodiert Sonderzeichen und behält Ordner, Ansicht und Suchbegriff', () => {
+	const start = script.indexOf('function moviesViewUrl(');
+	const end = script.indexOf('function initTimerEditForm(', start);
+	let url;
+	const button = {dataset: {directory: '/movie/Film + Serien/', view: 'folders'}};
+	const form = {dataset: {directory: button.dataset.directory, view: 'folders', search: ''},
+		elements: {find: {value: '  Straße & "Film" + #?  '}}};
+	const sorts = [];
+	const context = {
+		URLSearchParams,
+		document: {querySelector: selector => selector === '.movies-view-toggle' ? button : form},
+		load_maincontent_spin: value => { url = value; },
+		load_maincontent_spin_force: value => { url = value; },
+		MLHelper: {SortMovies(value) { sorts.push(value); }, ChangeSort() {}, ReadMovies() {}},
+	};
+	vm.runInNewContext(script.slice(start, end), context);
+	context.searchMovies(form);
+	const expected = 'ajax/moviesearch?dirname=%2Fmovie%2FFilm+%2B+Serien%2F&find=Stra%C3%9Fe+%26+%22Film%22+%2B+%23%3F';
+	assert.equal(url, expected);
+	form.dataset.search = form.elements.find.value.trim();
+	form.elements.find.value = 'Nicht abgesendeter Text';
+	context.refreshMoviesView();
+	assert.equal(url, expected);
+	context.changeMoviesortSearch('dated');
+	assert.equal(url, expected);
+	assert.deepEqual(sorts, ['dated']);
+	context.clearMoviesSearch();
+	assert.equal(url, context.moviesViewUrl(button.dataset.directory, false));
+	form.dataset.view = 'list';
+	form.elements.find.value = '   ';
+	context.searchMovies(form);
+	assert.equal(url, context.moviesViewUrl(button.dataset.directory, true));
+	form.elements.find.value = 'Film';
+	context.searchMovies(form);
+	assert.equal(url, context.moviesViewUrl(button.dataset.directory, true, 'Film'));
+});

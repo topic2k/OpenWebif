@@ -1013,13 +1013,25 @@ function editTimer(serviceref, begin, end, evtid) {
 	
 }
 
-function moviesViewUrl(directory, listView)
+function moviesViewUrl(directory, listView, search)
 {
 	const params = new URLSearchParams();
 	if (directory) params.set('dirname', directory);
 	if (listView) params.set('recursive', '1');
+	if (search) params.set('find', search);
 	const query = params.toString();
-	return 'ajax/movies' + (query ? '?' + query : '');
+	return (search ? 'ajax/moviesearch' : 'ajax/movies') + (query ? '?' + query : '');
+}
+
+function searchMovies(form)
+{
+	load_maincontent_spin_force(moviesViewUrl(form.dataset.directory, form.dataset.view === 'list', form.elements['find'].value.trim()));
+}
+
+function clearMoviesSearch()
+{
+	const form = document.querySelector('#movie-search-form');
+	if (form) load_maincontent_spin_force(moviesViewUrl(form.dataset.directory, form.dataset.view === 'list'));
 }
 
 function toggleMoviesView()
@@ -1036,8 +1048,8 @@ function openMoviesDirectory(directory)
 
 function refreshMoviesView()
 {
-	const button = document.querySelector('.movies-view-toggle');
-	if (button) load_maincontent_spin_force(moviesViewUrl(button.dataset.directory, button.dataset.view === 'list'));
+	const button = document.querySelector('#movie-search-form') || document.querySelector('.movies-view-toggle');
+	if (button) load_maincontent_spin_force(moviesViewUrl(button.dataset.directory, button.dataset.view === 'list', button.dataset.search));
 }
 
 function changeMoviesort(sort)
@@ -1050,10 +1062,7 @@ function changeMoviesort(sort)
 
 function changeMoviesortSearch(sort)
 {
-	MLHelper.SortMovies(sort);
-	MLHelper.ChangeSort(sort);
-	MLHelper.ReadMovies();
-	load_maincontent_spin_force(lastcontenturl);
+	changeMoviesort(sort);
 }
 
 function initTimerEditForm()

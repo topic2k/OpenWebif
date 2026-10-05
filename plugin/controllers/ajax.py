@@ -191,7 +191,10 @@ class AjaxController(BaseController):
 				"refresh_time": config.OpenWebif.webcache.screenshot_refresh_time.value
 				}
 
-	def P_movies(self, request):
+	def P_moviesearch(self, request):
+		return self.P_movies(request, search=getUrlArg(request, "find", "").strip())
+
+	def P_movies(self, request, search=None):
 		directory = getUrlArg(request, "dirname")
 		if directory is None:
 			if config.OpenWebif.webcache.moviedir.value and isdir(config.OpenWebif.webcache.moviedir.value):
@@ -202,7 +205,19 @@ class AjaxController(BaseController):
 		else:
 			directory = None
 
-		movies = getMovieList(request.args, directory=directory)
+		args = request.args
+		if search:
+			args = dict(args)
+			args[b"recursive"] = [b"1"]
+		movies = getMovieList(args, directory=directory)
+		if search is not None:
+			if search:
+				query = search.casefold()
+				movies['movies'] = [movie for movie in movies['movies'] if any(
+					query in (movie.get(field) or '').casefold()
+					for field in ('eventname', 'description', 'descriptionExtended'))]
+			movies['search'] = search
+			movies['recursive'] = b"recursive" in request.args
 		movies['transcoding'] = globalVars.transcoding
 
 		sorttype = config.OpenWebif.webcache.moviesort.value

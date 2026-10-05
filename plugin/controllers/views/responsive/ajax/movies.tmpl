@@ -80,6 +80,19 @@
 						</ul>
 					</li>
 				</ul>
+				<div class="row clearfix">
+					<div class="col-xs-12 col-sm-4">
+						#set $movieView = 'list' if $recursive else 'folders'
+						<form action="/" method="get" id="movie-search-form" data-directory="$escape($directory, quote=True)" data-view="$movieView" data-search="" onsubmit="searchMovies(this); return false;" class="form-group" style="margin-bottom: 5px;">
+							<div class="form-line" style="display: inline-block; width: calc(100% - 60px);">
+								<input type="search" name="find" id="movie-search-text" placeholder="$tstrings['search']" aria-label="$tstrings['search']" class="form-control">
+							</div>
+							<button type="submit" class="btn btn-default waves-effect" aria-label="$tstrings['search']">
+								<i class="material-icons">search</i>
+							</button>
+						</form>
+					</div>
+				</div>
 			</div>
 			<div class="body">
 				<div id="tag-filter-movies" class="list-tag-filter" data-list="movies" data-known="$tstrings['known_tags']" data-used="$tstrings['tag_filter_used']" data-clear="$tstrings['tag_filter_clear']" data-matches="$tstrings['tag_filter_matches']" data-error="$tstrings['tag_filter_error']">
