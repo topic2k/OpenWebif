@@ -195,7 +195,12 @@ class AjaxController(BaseController):
 		return self.P_movies(request, search=getUrlArg(request, "find", "").strip())
 
 	def P_movies(self, request, search=None):
+		args = request.args
 		directory = getUrlArg(request, "dirname")
+		if b"recursive" in args and getViewsPath('ajax/movies.tmpl').startswith(f'{VIEWS_PATH}/responsive/'):
+			directory = getLocations()['default']
+			args = dict(args)
+			args[b"dirname"] = [directory.encode('utf-8')]
 		if directory is None:
 			if config.OpenWebif.webcache.moviedir.value and isdir(config.OpenWebif.webcache.moviedir.value):
 				directory = config.OpenWebif.webcache.moviedir.value
@@ -205,7 +210,6 @@ class AjaxController(BaseController):
 		else:
 			directory = None
 
-		args = request.args
 		if search:
 			args = dict(args)
 			args[b"recursive"] = [b"1"]

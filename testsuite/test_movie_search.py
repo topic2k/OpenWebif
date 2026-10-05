@@ -24,6 +24,8 @@ class MovieSearchControllerTests(unittest.TestCase):
                            and node.name in ('P_movies', 'P_moviesearch')]
         self.setting = SimpleNamespace(value='/movie/', save=Mock())
         self.sort = SimpleNamespace(value='name')
+        self.locations = {'default': '/movie/'}
+        self.view_path = '/views/responsive/ajax/movies.tmpl'
         self.movies = [
             {'eventname': 'Straße & Film', 'description': 'Kurztext', 'descriptionExtended': '', 'recordingtime': 3},
             {'eventname': 'Andere Aufnahme', 'description': 'Film über Tiere', 'descriptionExtended': '', 'recordingtime': 1},
@@ -38,7 +40,9 @@ class MovieSearchControllerTests(unittest.TestCase):
         functions = [node for node in utilities.body if isinstance(node, ast.FunctionDef)
                      and node.name in ('toBinary', 'toString', 'getUrlArg')]
         namespace = {'BaseController': object, 'getMovieList': self.get_list,
-                     'isdir': lambda path: path in ('/movie/', '/movie/Serien/'),
+                     'getLocations': lambda: self.locations,
+                     'getViewsPath': lambda name: self.view_path, 'VIEWS_PATH': '/views',
+                     'isdir': lambda path: path in ('/movie/', '/movie/Serien/', self.locations['default']),
                      'globalVars': SimpleNamespace(transcoding=True),
                      'config': SimpleNamespace(OpenWebif=SimpleNamespace(webcache=SimpleNamespace(
                          moviedir=self.setting, moviesort=self.sort)))}
@@ -70,12 +74,54 @@ class MovieSearchControllerTests(unittest.TestCase):
 
     def test_directory_sort_and_original_view_are_preserved(self):
         self.sort.value = 'dated'
-        result = self.search(dirname='/movie/Serien/', recursive='1')
+        result = self.search(dirname='/movie/Serien/')
         self.assertEqual(self.get_list.call_args.kwargs['directory'], '/movie/Serien/')
         self.assertEqual([movie['recordingtime'] for movie in result['movies']], [3, 2, 1])
         self.assertEqual(result['sort'], 'dated')
-        self.assertTrue(result['recursive'])
+        self.assertFalse(result['recursive'])
         self.setting.save.assert_called_once()
+
+    def test_all_recordings_use_main_path_instead_of_requested_or_cached_subdirectory(self):
+        for dirname in (None, '/movie/Serien/', '/missing/'):
+            with self.subTest(dirname=dirname):
+                self.setting.value = '/movie/Serien/'
+                self.setting.save.reset_mock()
+                args = {b'recursive': [b'1']}
+                if dirname is not None:
+                    args[b'dirname'] = [dirname.encode()]
+                before = dict(args)
+                result = self.controller.P_movies(SimpleNamespace(args=args))
+                self.assertEqual(args, before)
+                self.assertEqual(self.get_list.call_args.kwargs['directory'], '/movie/')
+                self.assertEqual(self.get_list.call_args.args[0][b'dirname'], [b'/movie/'])
+                self.assertEqual(result['directory'], '/movie/')
+                self.assertTrue(result['recursive'])
+                self.assertEqual(self.setting.value, '/movie/')
+                self.setting.save.assert_called_once()
+
+    def test_all_recordings_search_and_reset_keep_main_path(self):
+        for text in ('film', ''):
+            with self.subTest(text=text):
+                result = self.search(text, dirname='/movie/Serien/', recursive='1')
+                self.assertEqual(result['directory'], '/movie/')
+                self.assertEqual(self.get_list.call_args.args[0][b'dirname'], [b'/movie/'])
+                self.assertTrue(result['recursive'])
+        result = self.controller.P_movies(SimpleNamespace(args={b'dirname': [b'/movie/']}))
+        self.assertEqual(result['directory'], '/movie/')
+        self.assertFalse(result['recursive'])
+
+    def test_main_path_uses_configured_location_with_unicode(self):
+        self.locations['default'] = '/movie/Straße & Filme/'
+        result = self.search(dirname='/movie/Serien/', recursive='1')
+        self.assertEqual(self.get_list.call_args.args[0][b'dirname'], ['/movie/Straße & Filme/'.encode()])
+        self.assertEqual(result['directory'], self.locations['default'])
+
+    def test_classic_recursive_list_keeps_requested_directory(self):
+        self.view_path = '/views/ajax/movies.tmpl'
+        args = {b'dirname': [b'/movie/Serien/'], b'recursive': [b'1']}
+        result = self.controller.P_movies(SimpleNamespace(args=args))
+        self.assertEqual(result['directory'], '/movie/Serien/')
+        self.assertEqual(self.get_list.call_args.args[0], args)
 
     def test_empty_search_uses_normal_list_without_forcing_recursion(self):
         result = self.search('   ')
@@ -106,7 +152,7 @@ class MovieMarkupParser(HTMLParser):
 
 
 class MovieSearchTemplateTests(unittest.TestCase):
-    def render(self, name, compact=False, movies=None, search='Film & "<Suche>"'):
+    def render(self, name, compact=False, movies=None, search='Film & "<Suche>"', recursive=False, bookmarks=None):
         translations = ModuleType('Plugins.Extensions.OpenWebif.controllers.i18n')
         translations.tstrings = defaultdict(str, movies='Aufnahmen', search='Suchen',
                                              tag_filter_matches='%d Treffer', tag_filter_clear='Zurücksetzen')
@@ -128,7 +174,7 @@ class MovieSearchTemplateTests(unittest.TestCase):
                                         cacheCompilationResults=False)
             output = str(template(searchList=[{
                 'movies': [movie] if movies is None else movies, 'directory': '/movie/A & B/',
-                'bookmarks': [], 'transcoding': False, 'recursive': False, 'search': search, 'time': time}]))
+                'bookmarks': bookmarks or [], 'transcoding': False, 'recursive': recursive, 'search': search, 'time': time}]))
         parser = MovieMarkupParser()
         parser.feed(output)
         return output, parser.elements, movie
@@ -170,6 +216,15 @@ class MovieSearchTemplateTests(unittest.TestCase):
         self.assertIn('0 Treffer', output)
         self.assertIn('clearMoviesSearch()', output)
         self.assertFalse(any('data-filter-tags' in attrs for _, attrs in elements))
+
+    def test_subdirectory_selector_only_appears_in_folder_view(self):
+        for recursive in (False, True):
+            with self.subTest(recursive=recursive):
+                output, elements, _ = self.render('movies', recursive=recursive, bookmarks=['Serien', 'Film & Doku'])
+                selectors = [attrs for tag, attrs in elements if tag == 'select' and attrs.get('id') == 'directory']
+                self.assertEqual(len(selectors), 0 if recursive else 1)
+                if not recursive:
+                    self.assertIn('value="/movie/A &amp; B/Film &amp; Doku"', output)
 
 
 if __name__ == '__main__':
