@@ -208,6 +208,7 @@
 
     let allChannelsCache;
     let filterChannelsCache;
+    let isDuplicatingBouquet = false;
 
     const cTypeInput = document.forms['listTypeSelector'].elements['cType'];
     const tvRadioInput = document.forms['listTypeSelector'].elements['tvRadioMode'];
@@ -649,6 +650,33 @@
               });
           }
         );
+      },
+
+      duplicateBouquet: () => {
+        const selection = bqlPanel.selectedItems[0];
+        if (!selection || isDuplicatingBouquet) {
+          return;
+        }
+        const button = document.querySelector('button[name="duplicateBq"]');
+        const url = self.buildUrl('/bouqueteditor/api/duplicatebouquet', {
+          sBouquetRef: selection.dataset.sref,
+        });
+        isDuplicatingBouquet = true;
+        button.disabled = true;
+
+        return apiRequest(url)
+          .then((result) => {
+            if (!result || !result[0]) {
+              swal(tstr_error, result ? result[1] : tstr_bqe_duplicate_bq, 'error');
+              return;
+            }
+            return self.getBouquets()
+              .then((data) => self.populateBouquets(data));
+          })
+          .finally(() => {
+            isDuplicatingBouquet = false;
+            button.disabled = false;
+          });
       },
 
       // Delete selected bouquet(s) from bouquets panel
@@ -1128,6 +1156,7 @@
 
         (bqeContentEl.querySelector('button[name="newBq"]') || nullEl).onclick = self.addBouquet;
         (bqeContentEl.querySelector('button[name="renameBq"]') || nullEl).onclick = self.renameBouquet;
+        (bqeContentEl.querySelector('button[name="duplicateBq"]') || nullEl).onclick = self.duplicateBouquet;
         (bqeContentEl.querySelector('button[name="deleteBq"]') || nullEl).onclick = self.deleteBouquet;
 
         (bqeContentEl.querySelector('button[name="addUrl"]') || nullEl).onclick = self.addUrl;

@@ -1678,6 +1678,14 @@ msgstr ""
 msgid "Rename Bouquet"
 msgstr ""
 
+#: ../plugin/controllers/i18n.py
+msgid "Duplicate Bouquet"
+msgstr ""
+
+#: ../plugin/controllers/BouquetEditor.py
+msgid "Bouquet could not be duplicated."
+msgstr ""
+
 #: ../plugin/controllers/i18n.py:217
 msgid "Rename Recording"
 msgstr ""

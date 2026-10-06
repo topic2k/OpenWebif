@@ -487,6 +487,7 @@ tstrings = {
 	'bqe_search_enhanced': _("Search by name, sd / hd / uhd, or provider"),
 	'bqe_add_bq': _("Add Bouquet"),
 	'bqe_rename_bq': _("Rename Bouquet"),
+	'bqe_duplicate_bq': _("Duplicate Bouquet"),
 	'bqe_delete_bq': _("Delete Bouquet"),
 	'bqe_add_url': _("Add IPTV/URL"),
 	'bqe_add_marker': _("Add Marker"),

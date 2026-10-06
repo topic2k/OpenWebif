@@ -43,6 +43,7 @@ class BouquetEditor(Source):
 	RENAME_SERVICE = 12
 	ADD_MARKER_TO_BOUQUET = 13
 	IMPORT_BOUQUET = 14
+	DUPLICATE_BOUQUET = 15
 
 	BACKUP_PATH = "/tmp"  # nosec
 	BACKUP_FILENAME = "webbouqueteditor_backup.tar"
@@ -96,6 +97,8 @@ class BouquetEditor(Source):
 			self.result = self.addMarkerToBouquet(cmd)
 		elif self.func is self.IMPORT_BOUQUET:
 			self.result = self.importBouquet(cmd)
+		elif self.func is self.DUPLICATE_BOUQUET:
+			self.result = self.duplicateBouquet(cmd)
 		else:
 			self.result = (False, _("one two three four unknown command"))
 
@@ -109,17 +112,48 @@ class BouquetEditor(Source):
 			mode = int(param["mode"])
 		return self.addBouquet(bname, mode, None)
 
-	def addBouquet(self, bname, mode, services):
+	def duplicateBouquet(self, param):
+		refstr = param.get("sBouquetRef")
+		if not refstr:
+			return self.noBouquet()
+		ref = eServiceReference(refstr)
+		if not ref.valid():
+			return self.noBouquet()
+		servicehandler = eServiceCenter.getInstance()
+		for mode, root in ((MODE_TV, ROOTTV), (MODE_RADIO, ROOTRADIO)):
+			bouquetlist = servicehandler.list(eServiceReference(root))
+			bouquets = bouquetlist.getContent("R", True) if bouquetlist else []
+			if not any(bouquet.toString() == ref.toString() for bouquet in (bouquets or [])):
+				continue
+			services = servicehandler.list(ref)
+			if services is None:
+				return self.noBouquet()
+			contents = services.getContent("R", True)
+			if contents is None:
+				return self.noBouquet()
+			name = self.getName(ref)
+			if not name:
+				return self.noBouquetName()
+			names = {self.getName(bouquet) for bouquet in bouquets}
+			number = 1
+			while f"{name} - Kopie {number}" in names:
+				number += 1
+			return self.addBouquet(f"{name} - Kopie {number}", mode, contents, append_mode=False, abort_on_service_error=True)
+		return self.noBouquet()
+
+	def addBouquet(self, bname, mode, services, append_mode=True, abort_on_service_error=False):
 		if config.usage.multibouquet.value:
 			mutablebouquetlist = self.getMutableBouquetList(mode)
 			if mutablebouquetlist:
 				prefix = "userbouquet"
 				name, filename = self.buildBouquetID(bname, prefix, mode)
 				if mode == MODE_TV:
-					bname += " (TV)"
+					if append_mode:
+						bname += " (TV)"
 					sref = f'1:7:1:0:0:0:0:0:0:0:FROM BOUQUET "{prefix}.{name}.tv" ORDER BY bouquet'
 				else:
-					bname += " (Radio)"
+					if append_mode:
+						bname += " (Radio)"
 					sref = f'1:7:2:0:0:0:0:0:0:0:FROM BOUQUET "{prefix}.{name}.radio" ORDER BY bouquet'
 				new_bouquet_ref = eServiceReference(sref)
 				if not mutablebouquetlist.addService(new_bouquet_ref):
@@ -132,10 +166,17 @@ class BouquetEditor(Source):
 							for service in services:
 								if mutablebouquet.addService(service):
 									print(f"add {service.toString()} to new bouquet failed")
+									if abort_on_service_error:
+										self.removeBouquet({"sBouquetRef": sref, "mode": mode})
+										eDVBDB.getInstance().reloadBouquets()
+										return (False, _("Bouquet could not be duplicated."))
 						mutablebouquet.flushChanges()
 						self.setRoot(self.bouquet_rootstr)
 						return (True, _("Bouquet %s created.") % bname)
 					else:
+						if abort_on_service_error:
+							self.removeBouquet({"sBouquetRef": sref, "mode": mode})
+							eDVBDB.getInstance().reloadBouquets()
 						return (False, _("Get mutable list for new created bouquet failed!"))
 
 				else:

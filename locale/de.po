@@ -1761,6 +1761,14 @@ msgstr "Umbenennen"
 msgid "Rename Bouquet"
 msgstr "Bouquet umbenennen"
 
+#: ../plugin/controllers/i18n.py
+msgid "Duplicate Bouquet"
+msgstr "Bouquet duplizieren"
+
+#: ../plugin/controllers/BouquetEditor.py
+msgid "Bouquet could not be duplicated."
+msgstr "Bouquet konnte nicht dupliziert werden."
+
 #: ../plugin/controllers/i18n.py:217
 msgid "Rename Recording"
 msgstr "Aufnahme umbenennen"
