@@ -1,6 +1,8 @@
+import re
 import subprocess
 import tempfile
 import unittest
+from fnmatch import fnmatchcase
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import mock_open, patch
@@ -47,6 +49,18 @@ class CreateIpkVersionTests(unittest.TestCase):
         self._assert_version(
             "2.4.0", ["enigma2-plugin-extensions-openwebif_2.4.0-git20260928-r18_all.ipk"],
             "20260929", "git20260929-r19"
+        )
+
+    def test_edition_packages_continue_revision_sequence(self):
+        self._assert_version(
+            "2.4.0",
+            (
+                "enigma2-plugin-extensions-openwebif_2.4.0-git20260928-r18_all.ipk",
+                "enigma2-plugin-extensions-openwebif_topic2k-edition_2.4.0-git20260929-r19_all.ipk",
+                "enigma2-plugin-extensions-openwebif_topic2k-edition_2.4.0-git20260930-r99_arm.ipk",
+                "enigma2-plugin-extensions-openwebif_topic2k-edition_2.4.01-git20260930-r99_all.ipk",
+            ),
+            "20260928", "git20260929-r20"
         )
 
     def test_clock_behind_latest_package_does_not_downgrade(self):
@@ -106,13 +120,29 @@ class CreateIpkVersionTests(unittest.TestCase):
                 first_contents = first.read_bytes()
                 second = Path(build_ipk(tmpdir))
 
-            self.assertTrue(first.name.endswith("_2.4.0-git20260928-r0_all.ipk"))
-            self.assertTrue(second.name.endswith("_2.4.0-git20260928-r1_all.ipk"))
+            self.assertEqual(first.name, "enigma2-plugin-extensions-openwebif_topic2k-edition_2.4.0-git20260928-r0_all.ipk")
+            self.assertEqual(second.name, "enigma2-plugin-extensions-openwebif_topic2k-edition_2.4.0-git20260928-r1_all.ipk")
             self.assertEqual(first.parent, Path(tmpdir, ".dist"))
             self.assertEqual(second.parent, Path(tmpdir, ".dist"))
             self.assertFalse(list(Path(tmpdir).glob("*.ipk")))
             self.assertEqual(first.read_bytes(), first_contents)
             self.assertTrue(second.is_file())
+
+    def test_shell_builder_and_download_references_use_edition_filename(self):
+        root = Path(__file__).resolve().parents[1]
+        prefix = "enigma2-plugin-extensions-openwebif_topic2k-edition_"
+        shell = (root / "CI" / "create_ipk.sh").read_text(encoding="utf-8")
+        self.assertIn(f"PKG=${{D}}/.dist/{prefix}${{VER}}-${{GITVER}}_all.ipk", shell)
+        self.assertIn("Package: enigma2-plugin-extensions-openwebif\n", shell)
+
+        latest = f"{prefix}latest_all.ipk"
+        workflow = (root / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
+        self.assertIn(f'ln -s "${{PKG1}}" {latest}', workflow)
+        pattern = re.search(r"path: ./Rel/(\S+\.ipk)", workflow).group(1)
+        self.assertTrue(fnmatchcase(f"{prefix}2.4.0-git20260928-r0_all.ipk", pattern))
+        self.assertFalse(fnmatchcase(latest, pattern))
+        self.assertFalse(fnmatchcase("enigma2-plugin-extensions-openwebif_2.4.0-git20260928-r0_all.ipk", pattern))
+        self.assertIn(f"<{latest}>", (root / "doc" / "source" / "index.rst").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

@@ -148,7 +148,7 @@ def get_version(root_dir):
 
     # Revisions belong to the base version, not to a particular build date.
     pkg_pattern = re.compile(
-        rf'enigma2-plugin-extensions-openwebif_{re.escape(ver)}-git(\d{{8}})-r(\d+)_all\.ipk'
+        rf'enigma2-plugin-extensions-openwebif_(?:topic2k-edition_)?{re.escape(ver)}-git(\d{{8}})-r(\d+)_all\.ipk'
     )
     latest_date = max(build_date, git_date) if re.fullmatch(r'\d{8}', git_date) else build_date
     latest_revision = -1
@@ -176,7 +176,7 @@ def get_build_branch(root_dir):
 def build_ipk(root_dir):
     ver, git_ver = get_version(root_dir)
     pkg_ver = f"{ver}-{git_ver}"
-    pkg_filename = f"enigma2-plugin-extensions-openwebif_{pkg_ver}_all.ipk"
+    pkg_filename = f"enigma2-plugin-extensions-openwebif_topic2k-edition_{pkg_ver}_all.ipk"
     dist_dir = os.path.join(root_dir, ".dist")
     pkg_path = os.path.join(dist_dir, pkg_filename)
 

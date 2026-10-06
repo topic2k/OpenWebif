@@ -11,7 +11,7 @@ Welcome to OpenWebif's documentation!
 
 Links
 ==================
-* `Latest ipk <enigma2-plugin-extensions-openwebif_latest_all.ipk>`_
+* `Latest ipk <enigma2-plugin-extensions-openwebif_topic2k-edition_latest_all.ipk>`_
 
 Indices and tables
 ==================
