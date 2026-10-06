@@ -1350,10 +1350,11 @@ function WebConfig() {
 
 	$('#minmovielist').change(function () {
 		let val = $(this).is(":checked") ? '1' : '0'
-		$.get('api/setwebconfig?minmovielist=' + val);
-		if ( lastcontenturl.startsWith('ajax/movies') ) {
-			load_maincontent_spin_force(lastcontenturl);
-		}
+		$.get('api/setwebconfig?minmovielist=' + val, function(result) {
+			if (result.result && /^ajax\/movies(?:earch)?(?:\?|$)/.test(lastcontenturl)) {
+				load_maincontent_spin_force(lastcontenturl);
+			}
+		});
 	});
 	$('#mintimerlist').change(function () {
 		let val = $(this).is(":checked") ? '1' : '0'

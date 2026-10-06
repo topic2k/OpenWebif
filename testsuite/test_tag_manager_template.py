@@ -116,18 +116,25 @@ class TagManagerTemplateTests(unittest.TestCase):
                  'description': 'Beschreibung', 'descriptionExtended': ''}
         with patch.dict('sys.modules', {translations.__name__: translations, defaults.__name__: defaults}), \
              patch('builtins._', lambda text: text, create=True):
-            for recursive, icon, view in ((False, 'ic:sharp-account-tree', 'folders'),
-                                          (True, 'ic:sharp-view-list', 'list')):
-                with self.subTest(recursive=recursive):
-                    rendered = str(Template(file=str(folder / 'movies.tmpl'),
-                                            searchList=[{'movies': [movie], 'directory': '/movie/Film & Serien/',
-                                                         'bookmarks': ['Staffel 1'], 'transcoding': False,
-                                                         'recursive': recursive, 'time': time}]))
-                    self.assertIn('data-view="' + view + '"', rendered)
-                    self.assertIn('data-directory="/movie/Film &amp; Serien/"', rendered)
-                    self.assertIn('data-icon="' + icon + '"', rendered)
-                    self.assertIn('class="movie-recording-path">/movie/Film &amp; Serien/Staffel 1</span>', rendered)
-                    self.assertIn('value="/movie/Film &amp; Serien/Staffel 1"', rendered)
+            for compact in (False, True):
+                defaults.isSettingEnabled = lambda name: 'checked' if compact else ''
+                for recursive, icon, view in ((False, 'ic:sharp-account-tree', 'folders'),
+                                              (True, 'ic:sharp-view-list', 'list')):
+                    with self.subTest(compact=compact, recursive=recursive):
+                        rendered = str(Template(file=str(folder / 'movies.tmpl'),
+                                                searchList=[{'movies': [movie], 'directory': '/movie/Film & Serien/',
+                                                             'bookmarks': ['Staffel 1'], 'transcoding': False,
+                                                             'recursive': recursive, 'time': time}]))
+                        self.assertIn('data-view="' + view + '"', rendered)
+                        self.assertIn('data-directory="/movie/Film &amp; Serien/"', rendered)
+                        self.assertIn('data-icon="' + icon + '"', rendered)
+                        self.assertIn('class="movie-recording-path">/movie/Film &amp; Serien/Staffel 1</span>', rendered)
+                        if recursive:
+                            self.assertNotIn('id="directory"', rendered)
+                            self.assertNotIn('value="/movie/Film &amp; Serien/Staffel 1"', rendered)
+                        else:
+                            self.assertIn('id="directory"', rendered)
+                            self.assertIn('value="/movie/Film &amp; Serien/Staffel 1"', rendered)
 
     def test_delete_dialog_has_three_distinct_actions(self):
         filename = Path(__file__).resolve().parents[1] / 'plugin/controllers/views/responsive/ajax/tagmanager.tmpl'

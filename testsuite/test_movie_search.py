@@ -152,7 +152,8 @@ class MovieMarkupParser(HTMLParser):
 
 
 class MovieSearchTemplateTests(unittest.TestCase):
-    def render(self, name, compact=False, movies=None, search='Film & "<Suche>"', recursive=False, bookmarks=None):
+    def render(self, name, compact=False, movies=None, search='Film & "<Suche>"', recursive=False, bookmarks=None,
+               transcoding=False):
         translations = ModuleType('Plugins.Extensions.OpenWebif.controllers.i18n')
         translations.tstrings = defaultdict(str, movies='Aufnahmen', search='Suchen',
                                              tag_filter_matches='%d Treffer', tag_filter_clear='Zurücksetzen')
@@ -174,7 +175,8 @@ class MovieSearchTemplateTests(unittest.TestCase):
                                         cacheCompilationResults=False)
             output = str(template(searchList=[{
                 'movies': [movie] if movies is None else movies, 'directory': '/movie/A & B/',
-                'bookmarks': bookmarks or [], 'transcoding': False, 'recursive': recursive, 'search': search, 'time': time}]))
+                'bookmarks': bookmarks or [], 'transcoding': transcoding, 'recursive': recursive,
+                'search': search, 'time': time}]))
         parser = MovieMarkupParser()
         parser.feed(output)
         return output, parser.elements, movie
@@ -216,6 +218,56 @@ class MovieSearchTemplateTests(unittest.TestCase):
         self.assertIn('0 Treffer', output)
         self.assertIn('clearMoviesSearch()', output)
         self.assertFalse(any('data-filter-tags' in attrs for _, attrs in elements))
+
+    def test_regular_recordings_switch_between_compact_rows_and_normal_cards(self):
+        for compact in (False, True):
+            for recursive in (False, True):
+                with self.subTest(compact=compact, recursive=recursive):
+                    output, elements, movie = self.render('movies', compact=compact, recursive=recursive)
+                    self.assertEqual('row-striped' in output, compact)
+                    self.assertEqual('class="progress progress-striped"' in output, not compact)
+                    self.assertIn('60 min. / 1 GB', output)
+                    self.assertIn('Sender', output)
+                    self.assertIn('Film &quot;&lt;Titel&gt;&quot; &amp; Straße', output)
+                    self.assertNotIn('<Titel>', output)
+                    self.assertNotIn('<Text>', output)
+                    self.assertIn('data-filter-tags="Film_&amp;_Serie"', output)
+                    self.assertIn('class="list-tag-item-tags"', output)
+                    self.assertIn('id="eventid0"', output)
+                    self.assertIn('data-view="list"' if recursive else 'data-view="folders"', output)
+                    actions = [attrs for _, attrs in elements if 'data-movie-title' in attrs]
+                    self.assertEqual(len(actions), 2)
+                    self.assertTrue(all(attrs['data-movie-title'] == movie['eventname'] for attrs in actions))
+
+    def test_regular_recording_actions_and_deletion_targets_in_both_layouts(self):
+        _, _, movie = self.render('movies')
+        for compact in (False, True):
+            for transcoding in (False, True):
+                with self.subTest(compact=compact, transcoding=transcoding):
+                    output, elements, _ = self.render('movies', compact=compact, movies=[movie, movie],
+                                                      transcoding=transcoding)
+                    ids = [attrs['id'] for _, attrs in elements if 'id' in attrs]
+                    self.assertEqual(len(ids), len(set(ids)))
+                    items = [attrs for _, attrs in elements if 'data-filter-tags' in attrs]
+                    self.assertEqual(len(items), 2)
+                    for count in range(2):
+                        self.assertIn(str(count), ids)
+                        self.assertIn('eventid' + str(count), ids)
+                        self.assertIn("deleteMovie(this.dataset.movieRef,'" + str(count) + "',", output)
+                    for action in ('playRecording(', 'renameMovie(', 'deleteMovie(', '/file?action=download'):
+                        self.assertIn(action, output)
+                    self.assertEqual('jumper80(' in output, transcoding)
+                    self.assertEqual('jumper8003(' in output, transcoding)
+                    self.assertEqual('web/ts.m3u?file=' in output, not transcoding)
+
+    def test_empty_regular_list_keeps_navigation_in_both_layouts(self):
+        for compact in (False, True):
+            with self.subTest(compact=compact):
+                output, elements, _ = self.render('movies', compact=compact, movies=[], bookmarks=['Serien'])
+                self.assertIn('id="movie-search-form"', output)
+                self.assertIn('id="directory"', output)
+                self.assertIn('data-tag-filter-toggle="movies"', output)
+                self.assertFalse(any('data-filter-tags' in attrs for _, attrs in elements))
 
     def test_subdirectory_selector_only_appears_in_folder_view(self):
         for recursive in (False, True):

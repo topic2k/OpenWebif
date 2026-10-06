@@ -5,6 +5,21 @@
 #from Plugins.Extensions.OpenWebif.controllers.i18n import tstrings
 #from Plugins.Extensions.OpenWebif.controllers.defaults import isSettingEnabled
 
+#set $compact = $isSettingEnabled('minmovielist') == 'checked'
+
+#def movieActions($movie, $count)
+	<li><a href="javascript:void(0);" class="link--skinned" onclick="playRecording('$quote($movie.serviceref, safe='')'); return false;" title="$tstrings['playback']"><i class="material-icons material-icons-centered">play_circle_outline</i></a></li>
+	#if $transcoding
+	<li><a href="javascript:void(0);" class="link--skinned" onclick="jumper80('$quote($movie.filename, safe='')'); return false;" title="$tstrings['stream']"><i class="material-icons material-icons-centered">tv</i></a></li>
+	<li><a href="javascript:void(0);" class="link--skinned" onclick="jumper8003('$quote($movie.filename, safe='')'); return false;" title="$tstrings['stream'] ($tstrings['transcoded'])"><i class="material-icons material-icons-centered">phone_android</i></a></li>
+	#else
+	<li><a href="web/ts.m3u?file=$quote($movie.filename, safe='')" class="link--skinned" title="$tstrings['stream']" target="_blank" rel="noopener"><i class="material-icons material-icons-centered">tv</i></a></li>
+	#end if
+	<li><a href="/file?action=download&amp;file=$quote($movie.filename, safe='')" class="link--skinned" title="$tstrings['download']"><i class="material-icons material-icons-centered">cloud_download</i></a></li>
+	<li><a href="javascript:void(0);" class="link--skinned" data-movie-ref="$quote($movie.serviceref, safe='')" data-movie-title="$escape($movie.eventname, quote=True)" onclick="renameMovie(this.dataset.movieRef,this.dataset.movieTitle); return false;" title="$tstrings['rename_recording']"><i class="material-icons material-icons-centered">edit</i></a></li>
+	<li><a href="javascript:void(0);" class="link--skinned" data-movie-ref="$quote($movie.serviceref, safe='')" data-movie-title="$escape($movie.eventname, quote=True)" onclick="deleteMovie(this.dataset.movieRef,'$count',this.dataset.movieTitle); return false;" title="$tstrings['delete_recording']"><i class="material-icons material-icons-centered">delete</i></a></li>
+#end def
+
 <style>
 	.movies-card {
 		box-shadow: none;
@@ -144,34 +159,35 @@
 		<div class="body">
 			<div id="content_main">
 				<div id="tvcontentmain">
+					<div id="movies">
 					#set $count = 0
 					#for $movie in $movies
-					#set $mname = $movie.eventname.replace("\"", r"'")
+					#if $compact
+					<div class="row row-striped clearfix pad-top-15 list-tag-filter-item" id="$count" data-filter-tags="$escape($movie.tags or '', quote=True)">
+						<div class="col-xs-12 col-md-6">
+							<b><i class="material-icons material-icons-centered">movie</i>$escape($movie.eventname or $movie.filename) - $escape($movie.servicename)</b>
+							<span class="movie-recording-path">$escape($dirname($movie.filename))</span>
+							<span data-toggle="collapse" data-target="#eventid$count" aria-expanded="false" aria-controls="eventid$count" style="cursor:pointer;"><b>$escape($movie.description or '')</b><i class="material-icons material-icons-centered">expand_more</i></span>
+							<div class="list-tag-item-tags"></div>
+						</div>
+						#set $dateRecorded = $strftime('%c', $localtime($movie.recordingtime))
+						<div class="col-xs-12 col-md-3"><span>$dateRecorded | $escape(str($movie.length)) min. / $escape($movie.filesize_readable)</span></div>
+						<div class="col-xs-12 col-md-3 align-right"><ul class="list-inline">$movieActions($movie, $count)</ul></div>
+						<div class="col-xs-12 collapse" id="eventid$count"><p>$escape($movie.descriptionExtended or '')</p></div>
+					</div>
+					#else
 					<div class="row clearfix list-tag-filter-item" data-filter-tags="$escape($movie.tags or '', quote=True)">
-						<div class="col-xs-12" id="movies">
+						<div class="col-xs-12">
 								<div class="card" id="$count">
 									<div class="header">
 										<div class="row clearfix">
 											<div class="col-xs-8">
-												<h2><i class="material-icons material-icons-centered">movie</i>$movie.eventname - $movie.servicename<span class="movie-recording-path">$escape($dirname($movie.filename))</span></h2>
+												<h2><i class="material-icons material-icons-centered">movie</i>$escape($movie.eventname or $movie.filename) - $escape($movie.servicename)<span class="movie-recording-path">$escape($dirname($movie.filename))</span></h2>
 											</div>
 											<div class="col-xs-4">
-													<ul class="header-dropdown">
-														<li><span role="button"><a href="javascript:void(0);" onclick="playRecording('$quote($movie.serviceref)');" title="$tstrings['playback']"><i class="material-icons material-icons-centered">play_circle_outline</i></a></span></li>
-														#if $transcoding
-														<li><span role="button"><a href="javascript:void(0);" onclick="jumper80('$quote($movie.filename)');" title="$tstrings['stream']: $mname"><i class="material-icons material-icons-centered">tv</i></a></span></li>
-														<li><span role="button"><a href="javascript:void(0);" onclick="jumper8003('$quote($movie.filename)');" title="$tstrings['stream'] ($tstrings['transcoded']): $mname"><i class="material-icons material-icons-centered">phone_android</i></a></span></li>
-														#else
-														<li><span role="button"><a href="web/ts.m3u?file=$quote($movie.filename)" title="$tstrings['stream'] $mname" target="_blank"><i class="material-icons material-icons-centered">tv</i></a></span></li>
-														#end if
-														
-														#set $eventname_escaped =  $movie.eventname.replace("'", r"\'").replace('"', r"\'")
-														<li><span role="button"><a href="/file?action=download&file=$quote($movie.filename)" title="$tstrings['download'] $mname"><i class="material-icons material-icons-centered">cloud_download</i></a></span></li>
-														<li><span role="button"><a href='javascript:void(0);' onclick="renameMovie('$quote($movie.serviceref)','$eventname_escaped');" title="$tstrings['rename_recording']"><i class="material-icons material-icons-centered">edit</i></a></span></li>
-														<li><span role="button"><a href='javascript:void(0);' onclick="deleteMovie('$quote($movie.serviceref)', '$count', '$eventname_escaped'); return false;" title="$tstrings['delete_recording']"><i class="material-icons material-icons-centered">delete</i></a></span></li>
-													</ul>
+													<ul class="header-dropdown">$movieActions($movie, $count)</ul>
+												</div>
 											</div>
-										</div>
 											<div class="row clearfix" style="margin-bottom:-25px;">
 												<div class="col-xs-8">
 														#set $dateRecorded = time.strftime("%c", time.localtime($movie.recordingtime))
@@ -195,10 +211,10 @@
 									<div class="body">
 											<div class="row clearfix" style="margin-bottom:-25px;">
 												<div class="col-xs-12">
-													<span data-toggle="collapse" data-target="#eventid$count" aria-expanded="false"aria-controls="collapseExample" style="cursor:pointer;"><b>$movie.description</b><i class="material-icons material-icons-centered">expand_more</i></span>
+													<span data-toggle="collapse" data-target="#eventid$count" aria-expanded="false" aria-controls="eventid$count" style="cursor:pointer;"><b>$escape($movie.description or '')</b><i class="material-icons material-icons-centered">expand_more</i></span>
 													<div class="list-tag-item-tags"></div>
 												<div class="collapse" id="eventid$count">
-													<p>$movie.descriptionExtended</p>
+													<p>$escape($movie.descriptionExtended or '')</p>
 												</div>
 											</div>
 										</div>
@@ -206,8 +222,10 @@
 								</div>
 						</div>
 					</div>
+					#end if
 					#set $count += 1
 					#end for
+					</div>
 				</div>
 			</div>
 		</div>

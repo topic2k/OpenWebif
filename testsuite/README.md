@@ -31,9 +31,9 @@ Die schnellen bestehenden Testläufe bleiben unverändert und benötigen keinen 
 
 ## Moderne Aufnahmensuche
 
-`test_movie_search.py` prüft den Suchcontroller sowie die gerenderten Vorlagen `movies.tmpl` und `moviesearch.tmpl`; `test_modern_movie_view.js` prüft Such-URLs und das Erhalten von Ordner, Ansicht und Suchbegriff. Abgedeckt sind Titel und Beschreibungen, Unterordner, Sortierung, Unicode/Sonderzeichen, leere Suche und fehlende Treffer sowie beide Suchergebnis-Darstellungen.
+`test_movie_search.py` prüft den Suchcontroller sowie die gerenderten Vorlagen `movies.tmpl` und `moviesearch.tmpl`; `test_modern_movie_view.js` prüft Such-URLs und das Erhalten von Ordner, Ansicht und Suchbegriff. Abgedeckt sind Titel und Beschreibungen, Unterordner, Sortierung, Unicode/Sonderzeichen, leere Suche und fehlende Treffer sowie die minimale und normale Darstellung der Aufnahmenliste und Suchergebnisse. Die Umschaltung wartet auf erfolgreiches Speichern und lädt nur eine weiterhin geöffnete Aufnahmenansicht neu.
 
-Mit den oben genannten Browserabhängigkeiten prüft `python -m unittest testsuite.integration.test_modern_movie_search -v` zusätzlich Button/Enter, Aktualisieren, Sortieren, Tagfilter und Zurücksetzen auf Desktop und Mobilgeräten. Dabei werden vollständige Cheetah-Vorlagen und die ausgelieferte Datei `plugin/public/modern/js/responsive.min.js` verwendet; sämtliche Browseranfragen bleiben in lokalen Fixtures. Dieser Test ist auch im separaten Integrationstestlauf enthalten.
+Mit den oben genannten Browserabhängigkeiten prüft `python -m unittest testsuite.integration.test_modern_movie_search -v` zusätzlich Button/Enter, Aktualisieren, Sortieren, Tagfilter und Zurücksetzen auf Desktop und Mobilgeräten sowie die sofortige Minimal-/Normal-Umschaltung in Ordneransicht, Gesamtliste und Suche. Dabei werden vollständige Cheetah-Vorlagen, gemeinsame Seitenstile, die echte Symbolschrift und die ausgelieferte Datei `plugin/public/modern/js/responsive.min.js` verwendet; sämtliche Browseranfragen bleiben in lokalen Fixtures. Dieser Test ist auch im separaten Integrationstestlauf enthalten.
 
 ## Neustart-Anzeige im Browser
 

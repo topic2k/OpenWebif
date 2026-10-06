@@ -87,3 +87,48 @@ test('Aufnahmensuche kodiert Sonderzeichen und behält Ordner, Ansicht und Suchb
 	context.searchMovies(form);
 	assert.equal(url, context.moviesViewUrl(button.dataset.directory, true, 'Film'));
 });
+
+test('Minimal/Normal wartet auf erfolgreiches Speichern und lädt Liste oder Suche sofort neu', () => {
+	const start = script.indexOf("$('#minmovielist').change(");
+	const end = script.indexOf("$('#mintimerlist').change(", start);
+	assert.ok(start !== -1 && end > start);
+	for (const content of ['ajax/movies?dirname=%2Fmovie%2F&recursive=1', 'ajax/moviesearch?find=Film']) {
+		for (const checked of [false, true]) {
+			let handler;
+			let request;
+			const reloads = [];
+			const $ = value => typeof value === 'string' ? {change(callback) { handler = callback; }} : {is: () => checked};
+			$.get = (url, callback) => { request = {url, callback}; };
+			const context = {$, lastcontenturl: content, load_maincontent_spin_force: url => reloads.push(url)};
+			vm.runInNewContext(script.slice(start, end), context);
+			handler.call({});
+			assert.equal(request.url, 'api/setwebconfig?minmovielist=' + (checked ? '1' : '0'));
+			assert.deepEqual(reloads, [], 'Nicht vor der Speicherbestätigung neu laden');
+			assert.equal(typeof request.callback, 'function');
+			request.callback({result: true});
+			assert.deepEqual(reloads, [content]);
+		}
+	}
+});
+
+test('Minimal/Normal lädt bei Speicherfehlern oder nach Verlassen der Aufnahmen nicht neu', () => {
+	const start = script.indexOf("$('#minmovielist').change(");
+	const end = script.indexOf("$('#mintimerlist').change(", start);
+	for (const content of ['ajax/movies', 'ajax/myepg', 'ajax/moviesettings', 'ajax/timers', '']) {
+		let handler;
+		let saved;
+		const reloads = [];
+		const $ = value => typeof value === 'string' ? {change(callback) { handler = callback; }} : {is: () => true};
+		$.get = (url, callback) => { saved = callback; };
+		const context = {$, lastcontenturl: 'ajax/movies', load_maincontent_spin_force: url => reloads.push(url)};
+		vm.runInNewContext(script.slice(start, end), context);
+		handler.call({});
+		context.lastcontenturl = content;
+		assert.equal(typeof saved, 'function');
+		saved({result: false});
+		assert.deepEqual(reloads, []);
+		context.lastcontenturl = content === 'ajax/movies' ? 'ajax/myepg' : content;
+		saved({result: true});
+		assert.deepEqual(reloads, []);
+	}
+});
