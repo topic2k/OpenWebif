@@ -114,7 +114,7 @@ async function navigate(page, selector, expectedMode, expectedOffset) {
         const table = document.getElementById('fulltbl');
         return table && parseFloat(table.style.height) > 0 && table !== window.previousEpgTable &&
             table.classList.contains('epg__tv-guide') === (mode === 1) &&
-            Number(table.dataset.slotStart) === midnight + offset * 86400;
+            Number(table.dataset.slotStart) === midnight + offset * 86400 + (mode === 1 && offset === 0 ? 20 * 3600 : 0);
     }, { mode: expectedMode, offset: expectedOffset, midnight: fixtures.midnight });
     await page.clock.runFor(200);
 }
@@ -436,7 +436,7 @@ for (const mode of [1, 2]) {
         const { page, loads } = await openEpg(t, mode);
         await navigate(page, '[data-day="1"]', mode, 1);
         assert.equal(await intervalCount(page), 0);
-        assert.equal(await page.locator('[data-day="200"]').count(), 0);
+        assert.equal(await page.locator('[data-day="200"]').isVisible(), true);
         assert.ok((await page.locator('#epg-date-range').textContent()).includes('29.Sep 2026'));
         for (const [selector, hour] of [['#pt0', 6], ['#pt1', 12], ['#pt2', 20]]) {
             assert.equal(Number(await page.locator(selector).getAttribute('data-time')), fixtures.midnight + 86400 + hour * 3600);
@@ -446,6 +446,37 @@ for (const mode of [1, 2]) {
         assert.equal(loads.length, 2, 'Time jumps must scroll, not reload the page');
         if (mode === 2) assert.equal(await page.locator('.timetable-now').evaluate(node => node.style.height), '0px');
         else assert.equal(await page.locator('.epg__tv-guide-now').count(), 0);
+    });
+
+    test(`${view}: Jetzt kehrt aus Tages- und Wochenauswahl zur aktuellen Uhrzeit zurück`, async t => {
+        const { page, loads } = await openEpg(t, mode);
+        async function returnToNow() {
+            assert.equal(await page.locator('#pt4').isVisible(), true);
+            const before = loads.length;
+            await navigate(page, '#pt4', mode, 0);
+            assert.equal(loads.length, before + 1, 'Exactly one load returns to today');
+            assert.deepEqual(loads.at(-1), { mode, day: 0, week: 0 });
+            assert.equal(await intervalCount(page), 1);
+            const position = await page.locator('#fulltbl').evaluate((table, mode) => {
+                const expected = mode === 1 ? (Date.now() / 1000 - Number(table.dataset.slotStart)) / 15 :
+                    (Date.now() / 1000 - Number(table.dataset.first)) / 6 - 20;
+                return { actual: mode === 1 ? table.scrollTop : table.scrollLeft, expected };
+            }, mode);
+            assert.ok(Math.abs(position.actual - position.expected) < 2, JSON.stringify(position));
+            await page.locator('#pt4').click({ force: true });
+            assert.equal(loads.length, before + 1, 'On today, Now only scrolls');
+        }
+        await navigate(page, '[data-day="1"]', mode, 1);
+        await returnToNow();
+        if (mode === 2) await navigate(page, '[data-day="101"]', 1, 0);
+        await navigate(page, '[data-day="1001"]', 1, 7);
+        await navigate(page, '[data-day="2"]', 1, 9);
+        if (mode === 2) await navigate(page, '[data-day="102"]', 2, 9);
+        await returnToNow();
+        await page.locator('#epg-calendar-toggle').click({ force: true });
+        await waitForDom(page, () => document.querySelectorAll('#epg-calendar-grid button.has-epg').length === 2);
+        await navigate(page, '#epg-calendar-grid button:text-is("29")', mode, 1);
+        await returnToNow();
     });
 
     test(`${view}: wiederholtes Nachladen und Verlassen räumen Intervalle und Handler auf`, async t => {

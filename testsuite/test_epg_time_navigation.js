@@ -35,7 +35,7 @@ function jumpToTime(day, startHour = 0, primeTimeHour = {201: 6, 202: 12, 203: 2
 	};
 	runScript('(' + code + ').call({});', {
 		jQuery, Date: FixedDate,
-		config: {mode: 1, slotStart: Math.floor(new Date(2026, 8, 28, startHour).getTime() / 1000)}
+		config: {mode: 1, day: 0, week: 0, slotStart: Math.floor(new Date(2026, 8, 28, startHour).getTime() / 1000)}
 	});
 	return scroller.position;
 }
@@ -50,21 +50,58 @@ function jumpOnTimeline(day, now = 37800, first = 0, targetTime = {201: 6, 202: 
 		if (selector === '.timetable-now') return {css: () => '450px'};
 		throw new Error('Unexpected selector: ' + selector);
 	};
+	const FixedDate = class extends Date {
+		static now() { return now * 1000; }
+	};
 	runScript(functionSource('clampTimelineScroll') + '\n(' + code + ').call({});', {
-		jQuery, Date: {now: () => now * 1000}, config: {mode: 2, first}, tableNode: {scrollWidth, clientWidth}
+		jQuery, Date: FixedDate, config: {mode: 2, day: 0, week: 0, first, slotStart: first}, tableNode: {scrollWidth, clientWidth}
 	});
 	return scroller.position;
 }
 
-test('Uhrzeit-Auswahl ist auch in der Zeitschrift sichtbar, Jetzt nur für die aktuelle Woche', () => {
+test('Uhrzeit-Auswahl und Jetzt sind an jedem Tag in beiden Ansichten sichtbar', () => {
 	const nav = template.slice(template.indexOf('<div id="navepg">'), template.indexOf('display_mode'));
 	assert.ok(nav.indexOf("tstrings['prime_times']") < nav.indexOf('#if $mode == 1'));
 	for (const time of ['06:00', '12:00', '20:00']) assert.ok(nav.includes(time));
 	for (const day of [201, 202, 203]) assert.match(nav, new RegExp('data-day="' + day + '" data-time="'));
-	assert.match(nav, /#if \$day == 0 and \$week == 0\s*<li><div id="pt3"/);
+	assert.doesNotMatch(nav, /#if \$day == 0 and \$week == 0/);
 	assert.match(nav, /data-day="200">\$tstrings\['now'\]/);
 	assert.match(nav, /#if \$mode == 1\s*<li><div class="plusclick lbl">&nbsp;\$tstrings\['cw'\]/);
 });
+
+for (const mode of [1, 2]) {
+	for (const [day, week, offset] of [[1, 0, 1], [0, 1, 7], [2, 1, 9], [-1, 0, -1], [0, 0, -1]]) {
+		test(`Jetzt lädt heute vor dem Scrollen: Ansicht ${mode}, Tag ${day}, Woche ${week}, Datumsoffset ${offset}`, () => {
+			const midnight = new Date(2026, 8, 28).getTime() / 1000;
+			const config = {mode, day, week, slotStart: midnight + offset * 86400, first: midnight + offset * 86400,
+				bref: 'encoded-bouquet', epgmode: 'radio'};
+			let loadedUrl;
+			let onLoad;
+			let clicks = 0;
+			const container = {html(value) { assert.equal(value, 'spinner'); return this; },
+				load(url, callback) { loadedUrl = url; onLoad = callback; }};
+			const jQuery = selector => {
+				if (typeof selector === 'object') return {data: () => 200};
+				if (selector === '#tvcontent') return container;
+				if (selector === '#pt4') return {click() { clicks++; }};
+				throw new Error('Unexpected selector before today is loaded: ' + selector);
+			};
+			const FixedDate = class extends Date {
+				static now() { return (midnight + 10 * 3600 + 30 * 60) * 1000; }
+			};
+			runScript('(' + callbackSource("scope.find('.plusclick').click(") + ').call({});', {
+				jQuery, config, Date: FixedDate, loadspinner: 'spinner'
+			});
+			assert.equal(loadedUrl, 'ajax/multiepg?bref=encoded-bouquet&day=0&epgmode=radio&week=0');
+			assert.equal(clicks, 0, 'Do not scroll the old day');
+			assert.equal(typeof onLoad, 'function');
+			onLoad('', 'success');
+			assert.equal(clicks, 1, 'Scroll only after today has loaded');
+			onLoad('', 'error');
+			assert.equal(clicks, 1, 'A failed load must not trigger another jump');
+		});
+	}
+}
 
 test('Zeitschrift springt vertikal zu 06:00, 12:00, 20:00 und Jetzt', () => {
 	assert.equal(jumpToTime(201), 1440);

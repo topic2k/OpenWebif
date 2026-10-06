@@ -40,10 +40,8 @@
 <li><div id="pt0" class="plusclick navtab-inactive" data-day="201" data-time="$epgTime['prime_times'][0]">06:00</div></li>
 <li><div id="pt1" class="plusclick navtab-inactive" data-day="202" data-time="$epgTime['prime_times'][1]">12:00</div></li>
 <li><div id="pt2" class="plusclick navtab-inactive" data-day="203" data-time="$epgTime['prime_times'][2]">20:00</div></li>
-#if $day == 0 and $week == 0
-		<li><div id="pt3" class="plusclick navtab-inactive">&nbsp;</div>
-<li><div id="pt4" class="plusclick navtab-active" data-day="200">$tstrings['now']</div></li>
-#end if
+<li><div id="pt3" class="plusclick navtab-inactive">&nbsp;</div></li>
+<li><div id="pt4" class="plusclick navtab-#if $day==0 and $week==0 then 'active' else 'inactive' #" data-day="200">$tstrings['now']</div></li>
 
 #if $mode == 1
 <li><div class="plusclick lbl">&nbsp;$tstrings['cw']:&nbsp;</div></li>

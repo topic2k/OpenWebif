@@ -386,6 +386,12 @@ var reloadTimers = false;
 				} else if (day > 199) {
 					var d = day - 200;
 					var targetTime = d == 0 ? EpgTime.now() : Number(jQuery(this).data('time'));
+					if (d == 0 && (config.day !== 0 || config.week !== 0 || EpgTime.dayStart(targetTime) !== EpgTime.dayStart(config.slotStart))) {
+						jQuery('#tvcontent').html(loadspinner).load('ajax/multiepg?bref=' + config.bref + '&day=0&epgmode=' + epgmode + '&week=0', function(response, status) {
+							if (status === 'success' || status === 'notmodified') jQuery('#pt4').click();
+						});
+						return;
+					}
 					if (config.mode === 1) {
 						var slot = EpgTime.slot(targetTime, config.slotStart);
 						var rows = jQuery('#tbl1body tr');
