@@ -7,7 +7,7 @@ function keepVisibleShift(start, end, size, edge) {
 	return context.epgKeepVisibleShift(start, end, size, edge);
 }
 
-test('Zeitschrift: Sendungsdetails bleiben im freien Platz bis zur nächsten Sendung sichtbar', () => {
+test('Zeitschrift: Sendungsdetails bleiben innerhalb des festen Zeitblocks sichtbar', () => {
 	assert.equal(keepVisibleShift(100, 700, 60, 330), 230);
 	assert.equal(keepVisibleShift(100, 700, 60, 900), 540);
 	assert.equal(keepVisibleShift(100, 300, 60, 330), 140);
@@ -21,7 +21,7 @@ test('Zeitstrahl: Text langer Sendungen bleibt sichtbar, ohne über ihr Ende hin
 });
 
 test('beide modernen Ansichten verwenden die begrenzte Verschiebung', () => {
-	assert.match(source, /cell\.querySelectorAll\('\.epg__event'\)[\s\S]*?epgKeepVisibleShift\(start, end, event\.offsetHeight, edge\)/);
+	assert.match(source, /container\.querySelectorAll\('\.epg__event\[data-begin\]'\)[\s\S]*?epgKeepVisibleShift\(start, eventBounds\.bottom, info\.offsetHeight, edge\)/);
 	assert.match(source, /row\.querySelectorAll\('\.eventlist \.event\[data-begin\]'\)[\s\S]*?epgKeepVisibleShift\(start, eventBounds\.right, info\.offsetWidth, edge\)/);
 });
 
@@ -45,13 +45,13 @@ function runScroll(mode) {
 			offsetHeight: 60, style: {},
 			getBoundingClientRect() { return {top: 180 - scroll + (this._epgShift || 0)}; }
 		};
-		const cell = {
-			getBoundingClientRect: () => ({top: -100 - scroll, bottom: 300 - scroll, left: 0, right: 200}),
-			querySelectorAll: () => [first, second]
-		};
+		const events = [[-80, 180, first], [180, 300, second]].map(([top, bottom, info]) => ({
+			style: {}, getBoundingClientRect: () => ({top: top - scroll, bottom: bottom - scroll, left: 0, right: 200}),
+			querySelector: () => info
+		}));
 		container.querySelector = () => ({offsetHeight: 40});
-		container.querySelectorAll = () => [cell];
-		elements = {first, second, setScroll: value => { scroll = value; }};
+		container.querySelectorAll = () => events;
+		elements = {first, second, events, setScroll: value => { scroll = value; }};
 	} else {
 		let scroll = 0;
 		const info = {
@@ -89,6 +89,7 @@ test('Zeitschrift: beim Scrollen verdeckt eine Sendung ihre Nachfolger nicht', (
 	elements.setScroll(220);
 	update();
 	assert.equal(elements.second._epgShift, 60);
+	assert.ok(elements.events.every(event => event.style.transform === undefined), 'Time blocks must never be shifted');
 });
 
 test('Zeitstrahl: Text folgt horizontalem Scrollen und bleibt im Sendungsblock', () => {

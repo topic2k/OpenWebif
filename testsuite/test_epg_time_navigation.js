@@ -26,6 +26,7 @@ function jumpToTime(day, startHour = 0, primeTimeHour = {201: 6, 202: 12, 203: 2
 		if (typeof selector === 'object') return {data: name => name === 'day' ? day : Math.floor(new Date(2026, 8, 28, primeTimeHour).getTime() / 1000)};
 		if (selector === '#fulltbl') return scroller;
 		if (selector === '#tbl1body tr') return rows;
+		if (selector === '#tbl1body .epg__slot') return {first: () => ({length: 1, offset: () => ({top: 40})})};
 		if (selector === '.serviceheader') return {first: () => ({outerHeight: () => 40})};
 		throw new Error('Unexpected selector: ' + selector);
 	};
@@ -65,15 +66,15 @@ test('Uhrzeit-Auswahl ist auch in der Zeitschrift sichtbar, Jetzt nur für die a
 });
 
 test('Zeitschrift springt vertikal zu 06:00, 12:00, 20:00 und Jetzt', () => {
-	assert.equal(jumpToTime(201), 600);
-	assert.equal(jumpToTime(202), 1200);
-	assert.equal(jumpToTime(203), 2000);
-	assert.equal(jumpToTime(200), 1050);
+	assert.equal(jumpToTime(201), 1440);
+	assert.equal(jumpToTime(202), 2880);
+	assert.equal(jumpToTime(203), 4800);
+	assert.equal(jumpToTime(200), 2520);
 });
 
 test('Zeitschrift begrenzt vergangene Uhrzeiten vor dem ersten EPG-Slot', () => {
 	assert.equal(jumpToTime(201, 10), 0);
-	assert.equal(jumpToTime(202, 10), 200);
+	assert.equal(jumpToTime(202, 10), 480);
 });
 
 test('Zeitstrahl behält seinen horizontalen Uhrzeit-Sprung', () => {
@@ -89,7 +90,7 @@ test('Jetzt-Sprung im Zeitstrahl verwendet die aktuelle Uhrzeit statt einer vera
 });
 
 test('beide Ansichten verwenden den serverseitigen data-time-Wert statt einer festen Primetime', () => {
-	assert.equal(jumpToTime(201, 0, 8), 800);
+	assert.equal(jumpToTime(201, 0, 8), 1920);
 	assert.equal(jumpOnTimeline(201, 37800, 0, 8 * 3600), 4780);
 });
 

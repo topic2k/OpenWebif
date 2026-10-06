@@ -89,12 +89,11 @@
 			<tr>
 	#for $sname, $eventlist in $events.items()
 				<td class="border">
+					<div class="epg__slot" data-slot="$slot">
 		#for $event in $eventlist[$slot]
 			$renderEventBlock.render($event, $tstrings['edit_timer'])
 		#end for
-		#if len($eventlist[$slot]) == 0
-					<article class="epg__event event"></article>
-		#end if
+					</div>
 				</td>
 	#end for
 			</tr>
@@ -121,27 +120,16 @@
 			</div>
 			<div class="epg__events-col">
 				<ol class="eventlist">
-#set $c=0
-#set $ref = ''
 #for $event in $eventlist[0]
-	#set pad = 0
-	#set $dur = $event.duration
-	#if $c == 0
-		#set $ref = quote(event['ref'], safe=' ~@#$()*!+=:;,.?/\'')
-		#if $event.begin_timestamp < $first
-			#set pad = 0
-			#set $dur = ($event.begin_timestamp + $event.duration - $first)
-			#if $dur < 0
-				#set $dur = 0
-			#end if
-		#else
-			#set pad = ($event.begin_timestamp - $first) / 6
-		#end if
-		#if $pad > 0
-					<li class="event" style="width:${pad}px;border:none;"></li>
-		#end if
-	#end if
+	#set $ref = quote(event['ref'], safe=' ~@#$()*!+=:;,.?/\'')
 	#set $end = $event.begin_timestamp + $event.duration
+	#set $visibleBegin = max($event.begin_timestamp, $first)
+	#set $visibleEnd = min($end, $first + 30000 * 6)
+	#if $visibleEnd <= $visibleBegin
+		#continue
+	#end if
+	#set $eventLeft = ($visibleBegin - $first) / 6
+	#set $eventWidth = ($visibleEnd - $visibleBegin) / 6
 	#set $iscurr = ""
 	#if $event.begin_timestamp <= $now and $end > $now
 		#set $iscurr = " curevent"
@@ -150,7 +138,7 @@
 	#if $event['timer']
 		#set $timerClass = ' event--has-timer timer--' + $event['timer']['markerType']
 	#end if
-					<li class="event$timerClass" data-ref="$ref" data-id="${event.id}" data-begin="${event.begin_timestamp}" data-end="$end" data-toggle="modal" data-target="#EventModal" onclick="if (event.target.closest('.epg__timer-marker')) return; loadeventepg('${event.id}', '$ref');return false;" style="width:${dur/6}px;">
+					<li class="event$timerClass" data-ref="$ref" data-id="${event.id}" data-begin="${event.begin_timestamp}" data-end="$end" data-toggle="modal" data-target="#EventModal" onclick="if (event.target.closest('.epg__timer-marker')) return; loadeventepg('${event.id}', '$ref');return false;" style="left:${eventLeft}px;width:${eventWidth}px;">
 						<a href="javascript:void(0);" class="ui-widget-content ${iscurr}" title="$escape($event['title'], quote=True)">
 							<span class="epg__timeline-info">
 								<span class="ename">$escape($event['title'], quote=False)<span class="etimesmall"> ($strftime("%d.%m", $localtime($event['begin_timestamp'])))</span></span>
@@ -165,7 +153,6 @@
 						<button type="button" class="epg__timer-marker" data-metadata="$timerMetadata" data-toggle="modal" data-target="#TimerModal" onclick="event.stopPropagation(); jQuery('#TimerModal').modal('show', this); return false;" title="$tstrings['edit_timer']" aria-label="$tstrings['edit_timer']"></button>
 #end if
 					</li>
-	#set $c = $c + 1
 #end for
 				</ol>
 			</div>

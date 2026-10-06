@@ -37,8 +37,12 @@
 .modern-epg #navepg { margin-bottom: 1px; }
 .modern-epg #fulltbl { width: 100%; height: 100%; overflow: auto; }
 .modern-epg #fulltbl.epg__tv-guide { position: relative; }
-.modern-epg .epg__tv-guide-now { position: absolute; left: 0; height: 2px; z-index: 5; pointer-events: none; background-color: var(--skin-color, #0fb8fb); opacity: 0.4; display: none; }
-.modern-epg .epg__tv-guide .epg__event { position: relative; z-index: 6; }
+.modern-epg .epg__tv-guide-now { position: absolute; left: 0; height: 2px; z-index: 7; pointer-events: none; background-color: var(--skin-color, #0fb8fb); opacity: 0.4; display: none; }
+.modern-epg .epg__tv-guide #tbl1 { border-collapse: separate; border-spacing: 0; }
+.modern-epg .epg__tv-guide #tbl1body td.border { padding: 0; border: 0; }
+.modern-epg .epg__slot { position: relative; height: 480px; box-shadow: inset 0 1px rgba(127, 127, 127, 0.2); }
+.modern-epg .epg__tv-guide .epg__event { display: block; position: absolute; z-index: 6; width: 100%; box-sizing: border-box; overflow: hidden; padding: 0 0.2em 0 12px; }
+.modern-epg .epg__event-info { display: flex; flex-wrap: wrap; position: relative; max-height: 100%; overflow: hidden; }
 .modern-epg .notablemargin { margin: 0; }
 .modern-epg .ui-widget-content.nobg, .modern-epg .ui-widget-header.nobg { background-image: none; }
 .modern-epg .wrapper { overflow-x: auto; width: 100%; -ms-overflow-style: -ms-autohiding-scrollbar; }
@@ -54,7 +58,7 @@
 .modern-epg img[src*="default_picon"] { filter: grayscale(1) opacity(0.5); }
 .modern-epg .epg__event:hover { filter: brightness(1.2); }
 .modern-epg .epg__event:hover .epg__title { text-decoration: underline; }
-.modern-epg .epg__event.event--has-timer { position: relative; overflow: visible; }
+.modern-epg .epg__event.event--has-timer { overflow: hidden; }
 .modern-epg .timer--record { --epg-timer-marker: #e53935; }
 .modern-epg .timer--zap { --epg-timer-marker: #1e88e5; }
 .modern-epg .timer--record-zap { --epg-timer-marker: linear-gradient(to bottom, #e53935 50%, #1e88e5 50%); }
@@ -62,10 +66,10 @@
 	content: '';
 	display: block;
 	border-radius: 0;
-	top: -25%;
+	top: 0;
 	right: 0;
-	bottom: -10%;
-	left: -10px;
+	bottom: 0;
+	left: 0;
 	position: absolute;
 	width: 3px;
 	border: 0;
@@ -74,9 +78,9 @@
 }
 .modern-epg .event--has-timer .epg__timer-marker {
 	position: absolute;
-	top: -25%;
-	bottom: -10%;
-	left: -10px;
+	top: 0;
+	bottom: 0;
+	left: 0;
 	width: 12px;
 	z-index: 8;
 	padding: 0;
@@ -94,15 +98,14 @@
 .modern-epg--timeline .picon > img { max-height: 30px; }
 .modern-epg--timeline .timetable { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; border: none; }
 .modern-epg--timeline .timetable-now { position: absolute; top: 0; width: 2px; height: 100%; background-color: #0fb8fb; opacity: 0.4; }
-.modern-epg--timeline .eventlist { display: inline-block; list-style-type: none; margin: 0; padding: 0; width: 30000px; }
-.modern-epg--timeline .event { display: block; position: relative; vertical-align: top; clear: left; border: none; }
+.modern-epg--timeline .eventlist { position: relative; list-style-type: none; margin: 0; padding: 0; width: 30000px; height: 58px; }
+.modern-epg--timeline .event { display: block; position: absolute; top: 0; height: 58px; box-sizing: border-box; border: solid; border-width: 0 0 0 1px; padding: 0 !important; margin: 0 !important; }
 .modern-epg--timeline .event.event--has-timer::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--epg-timer-marker); z-index: 7; pointer-events: none; }
 .modern-epg--timeline .event.event--has-timer .epg__timer-marker { top: 0; bottom: 0; left: 0; }
 .modern-epg--timeline .event a, .modern-epg--timeline .event > span { padding: 0; height: 58px; width: 100%; display: block; white-space: normal; overflow: hidden; }
 .modern-epg--timeline .event a:link:hover { text-decoration: none; }
 .modern-epg--timeline .ename { display: block; width: 100%; padding-left: 5px; padding-top: 10px; float: left; font-weight: 200; font-size: 14px; }
 .modern-epg--timeline .etime, .modern-epg--timeline .etimer { display: inline-block; padding-left: 5px; font-weight: 200; font-size: 12px; }
-.modern-epg--timeline .event { display: inline-block; border: solid; border-width: 0 0 0 1px; padding: 0 !important; margin: 0 0 0 -3px !important; }
 .modern-epg--timeline .event .ename, .modern-epg--timeline .event .etime, .modern-epg--timeline .event .etimer { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .modern-epg--timeline .event .ename, .modern-epg--timeline .event .etime, .modern-epg--timeline .event .etimer { position: relative; z-index: 6; }
 .modern-epg--timeline .epg__timeline-info { display: block; position: relative; z-index: 6; width: max-content; max-width: 100%; }

@@ -17,7 +17,7 @@ from Cheetah.Template import Template
 ROOT = Path(__file__).resolve().parents[2]
 VIEWS = ROOT / 'plugin/controllers/views/responsive/ajax'
 MIDNIGHT = timegm((2026, 9, 28, 0, 0, 0))
-NOW = MIDNIGHT + 10 * 3600 + 30 * 60
+NOW = MIDNIGHT + 20 * 3600 + 47 * 60
 BOUQUET = '1:7:1:0:0:0:0:0:0:0:FROM BOUQUET "userbouquet.test.tv" ORDER BY bouquet'
 CONFIG_PROBE = '"><script>window.configInjected=true</script>&\'\\'
 
@@ -50,7 +50,7 @@ class RenderedModernEpgTests(unittest.TestCase):
             for mode in (1, 2):
                 for day, week in ((0, 0), (1, 0), (0, 1), (2, 1), (0, 2)):
                     # Match the controller/model contract: current two-hour slot, otherwise target midnight.
-                    slot_start = MIDNIGHT + (day + week * 7) * 86400 if day or week else MIDNIGHT + 10 * 3600
+                    slot_start = MIDNIGHT + (day + week * 7) * 86400 if day or week else MIDNIGHT + 20 * 3600
                     events = {}
                     for channel in ('1:0:1:AAA:', '1:0:1:BBB:'):
                         slots = [[] for _ in range(12 if mode == 1 else 1)]
@@ -72,6 +72,38 @@ class RenderedModernEpgTests(unittest.TestCase):
                     fixtures['%d:%d:%d' % (mode, day, week)] = str(template(searchList=[context]))
                     context['current_service_ref'] = CONFIG_PROBE
                     fixtures['%d:%d:%d:hostile' % (mode, day, week)] = str(template(searchList=[context]))
+                    geometry_events = {}
+                    base = MIDNIGHT + (day + week * 7) * 86400
+                    for channel_index, channel in enumerate(events):
+                        slots = [[] for _ in range(12 if mode == 1 else 1)]
+                        intervals = [
+                            (1000, (slot_start if mode == 1 else base) - 900, 1500),
+                            (1001, base + 20 * 3600 + 15 * 60, 90 * 60),
+                            (1002, base + 21 * 3600 + 45 * 60, 15 * 60),
+                            (1003, base + 22 * 3600, 5 * 3600),
+                            (1004, slot_start + 86400 - 900, 3600),
+                        ]
+                        intervals.extend((1100 + index, base + 27 * 3600 + 600 + index * 300, 180)
+                                         for index in range(80))
+                        for event_id, begin, duration in intervals:
+                            if channel_index and event_id >= 1100:
+                                if event_id % 2:
+                                    continue
+                                begin += 60
+                            event = {'id': event_id, 'ref': channel, 'begin_timestamp': begin,
+                                     'duration': duration, 'title': 'Sendung %d' % event_id,
+                                     'shortdesc': 'Beschreibung ' * (150 if channel_index else 1),
+                                     'timerStatus': '', 'timer': None}
+                            if event_id == 1001:
+                                event['timerStatus'] = 'waiting'
+                                event['timer'] = {'sref': channel, 'begin': begin, 'end': begin + duration,
+                                                  'markerType': 'record', 'isEnabled': True, 'isAutoTimer': False}
+                            slot = max(0, int((begin - slot_start) // 7200)) if mode == 1 else 0
+                            if slot < len(slots):
+                                slots[slot].append(event)
+                        geometry_events[channel] = slots
+                    context.update(events=geometry_events, current_service_ref='')
+                    fixtures['%d:%d:%d:geometry' % (mode, day, week)] = str(template(searchList=[context]))
 
         main = (VIEWS.parent / 'main.tmpl').read_text(encoding='utf-8')
         assets = {}

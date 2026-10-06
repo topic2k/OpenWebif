@@ -30,6 +30,36 @@ test('timeline positions include the channel column and advance one pixel per si
 	assert.equal(EpgTime.timelinePosition(10003, 10000), 140.5);
 });
 
+test('guide intervals and the 20:47 marker share a text-independent time scale', () => {
+	const begin = (20 * 60 + 15) * 60;
+	const end = (21 * 60 + 45) * 60;
+	const interval = EpgTime.interval(begin, end, 0, 86400, 15);
+	assert.deepEqual(interval, {start: begin, end, offset: 4860, length: 360});
+	const marker = EpgTime.guidePosition((20 * 60 + 47) * 60, 0);
+	assert.equal((marker - interval.offset) / interval.length, 32 / 90);
+	assert.ok(EpgTime.guidePosition(end, 0) > marker);
+});
+
+test('intervals clip only at the window edges, not at two-hour boundaries', () => {
+	assert.deepEqual(EpgTime.interval(-1800, 1800, 0, 86400, 15), {start: 0, end: 1800, offset: 0, length: 120});
+	assert.deepEqual(EpgTime.interval(7100, 7300, 0, 86400, 15), {start: 7100, end: 7300, offset: 7100 / 15, length: 200 / 15});
+	assert.deepEqual(EpgTime.interval(85000, 88000, 0, 86400, 15), {start: 85000, end: 86400, offset: 85000 / 15, length: 1400 / 15});
+	for (const [begin, end] of [[-10, 0], [86400, 87000], [20, 20], [30, 20], [NaN, 20]]) {
+		assert.equal(EpgTime.interval(begin, end, 0, 86400, 15), null);
+	}
+});
+
+test('timeline gaps and many short events never accumulate an offset', () => {
+	for (let index = 0; index < 200; index++) {
+		const begin = 10000 + index * 150;
+		const interval = EpgTime.interval(begin, begin + 90, 10000, 190000, 6);
+		assert.equal(interval.offset + 140, EpgTime.timelinePosition(begin, 10000));
+		assert.equal(interval.offset, index * 25);
+		assert.equal(interval.length, 15);
+	}
+	assert.deepEqual(EpgTime.interval(9900, 10090, 10000, 190000, 6), {start: 10000, end: 10090, offset: 0, length: 15});
+});
+
 test('timeline windows exclude the channel column and end before the next visible second', () => {
 	assert.deepEqual(EpgTime.timelineWindow(10000, 0, 600), {start: 10000, end: 12759});
 	assert.deepEqual(EpgTime.timelineWindow(10000, 600, 600), {start: 13600, end: 16359});

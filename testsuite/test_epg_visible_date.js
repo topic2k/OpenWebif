@@ -21,6 +21,7 @@ function displayDate({ magazine, scrollTop = 0, scrollLeft = 0, width = 600, row
 		'data-slot-start': stamp(1, 0), 'data-first': stamp(1, 0)
 	}, {
 		'#tbl1body tr': rows,
+		'.epg__event[data-begin]': rows.flatMap(row => row.querySelectorAll('.epg__event[data-begin]')),
 		'.epg__timeline-row': rows
 	});
 	container.scrollTop = scrollTop;
@@ -47,12 +48,24 @@ test('Zeitschrift zeigt morgens Vortag und gewählten Tag, nach Scrollen nur den
 	assert.equal(displayDate({magazine: true, rows}), 'Mi, 30.Sep 2026 / Do, 1.Okt 2026');
 	const scrolled = rows.map(row => ({
 		...row,
+		querySelectorAll: selector => row.querySelectorAll(selector).map(event => ({
+			...event, getBoundingClientRect: () => {
+				const rect = event.getBoundingClientRect();
+				return {...rect, top: rect.top - 600, bottom: rect.bottom - 600};
+			}
+		})),
 		getBoundingClientRect: () => {
 			const rect = row.getBoundingClientRect();
 			return {...rect, top: rect.top - 600, bottom: rect.bottom - 600};
 		}
 	}));
 	assert.equal(displayDate({magazine: true, rows: scrolled, scrollTop: 600}), 'Do, 1.Okt 2026');
+});
+
+test('Zeitschrift berücksichtigt slotübergreifende Sendungen aus einer unsichtbaren Ursprungszeile', () => {
+	const event = element({top: 50, bottom: 300, left: 0, right: 200}, {'data-begin': stamp(0, 23)});
+	const row = element({top: -400, bottom: 80, left: 0, right: 600}, {}, {'.epg__event[data-begin]': [event]});
+	assert.equal(displayDate({magazine: true, rows: [row]}), 'Mi, 30.Sep 2026');
 });
 
 test('Zeitstrahl berücksichtigt nur das sichtbare Zeitfenster und über Mitternacht laufende Sendungen', () => {

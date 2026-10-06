@@ -124,9 +124,9 @@ var reloadTimers = false;
 					var endFraction = Math.min(1, (bounds.bottom - rect.top) / (rect.bottom - rect.top));
 					addDate(EpgTime.slotTime(slotStart, index, startFraction));
 					addDate(EpgTime.slotTime(slotStart, index, endFraction) - 1);
-					row.querySelectorAll('.epg__event[data-begin]').forEach(function(event) {
-						if (visible(event.getBoundingClientRect())) addDate(Number(event.getAttribute('data-begin')));
-					});
+				});
+				container.querySelectorAll('.epg__event[data-begin]').forEach(function(event) {
+					if (visible(event.getBoundingClientRect())) addDate(Number(event.getAttribute('data-begin')));
 				});
 			} else {
 				var first = Number(container.getAttribute('data-first'));
@@ -149,6 +149,22 @@ var reloadTimers = false;
 			}).join(' / ');
 		}
 
+		function layoutTvGuide() {
+			if (!tableNode.classList.contains('epg__tv-guide')) return;
+			tableNode.querySelectorAll('.epg__slot').forEach(function(surface) {
+				var slotOffset = Number(surface.getAttribute('data-slot')) * 480;
+				surface.querySelectorAll('.epg__event[data-begin][data-end]').forEach(function(event) {
+					var interval = EpgTime.interval(Number(event.getAttribute('data-begin')), Number(event.getAttribute('data-end')),
+						config.slotStart, config.slotStart + 86400, EpgTime.guideSecondsPerPixel);
+					event.style.display = interval ? '' : 'none';
+					if (!interval) return;
+					event.style.top = interval.offset - slotOffset + 'px';
+					event.style.height = interval.length + 'px';
+				});
+			});
+		}
+		layoutTvGuide();
+
 		function updateKeepVisible() {
 			pending = false;
 			if (!alive()) return;
@@ -157,18 +173,14 @@ var reloadTimers = false;
 			if (container.classList.contains('epg__tv-guide')) {
 				var header = container.querySelector('.serviceheader');
 				var edge = bounds.top + (header ? header.offsetHeight : 0);
-				container.querySelectorAll('#tbl1body td.border').forEach(function(cell) {
-					var cellBounds = cell.getBoundingClientRect();
-					if (cellBounds.bottom <= edge || cellBounds.top >= bounds.bottom || cellBounds.right <= bounds.left || cellBounds.left >= bounds.right) return;
-					var events = cell.querySelectorAll('.epg__event');
-					events.forEach(function(event, index) {
-						var start = event.getBoundingClientRect().top - (event._epgShift || 0);
-						var next = events[index + 1];
-						var end = next ? next.getBoundingClientRect().top - (next._epgShift || 0) : cellBounds.bottom;
-						var shift = epgKeepVisibleShift(start, end, event.offsetHeight, edge);
-						event.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
-						event._epgShift = shift;
-					});
+				container.querySelectorAll('.epg__event[data-begin]').forEach(function(event) {
+					var eventBounds = event.getBoundingClientRect();
+					if (eventBounds.bottom <= edge || eventBounds.top >= bounds.bottom || eventBounds.right <= bounds.left || eventBounds.left >= bounds.right) return;
+					var info = event.querySelector('.epg__event-info');
+					var start = info.getBoundingClientRect().top - (info._epgShift || 0);
+					var shift = epgKeepVisibleShift(start, eventBounds.bottom, info.offsetHeight, edge);
+					info.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+					info._epgShift = shift;
 				});
 			} else {
 				var channel = container.querySelector('.epg__channel-col');
@@ -223,8 +235,12 @@ var reloadTimers = false;
 				return;
 			}
 			var container = jQuery('#fulltbl');
-			var row = rows.eq(slot.index);
-			var top = row.offset().top - container.offset().top + container.scrollTop() + row.outerHeight() * slot.fraction;
+			var origin = jQuery('#tbl1body .epg__slot').first();
+			if (!origin.length) {
+				marker.hide();
+				return;
+			}
+			var top = origin.offset().top - container.offset().top + container.scrollTop() + EpgTime.guidePosition(EpgTime.now(), config.slotStart);
 			marker.css({top: top + 'px', width: jQuery('#tbl1').outerWidth() + 'px'}).show();
 		}
 		if (config.day === 0 && config.week === 0) {
@@ -363,9 +379,10 @@ var reloadTimers = false;
 						var rows = jQuery('#tbl1body tr');
 						if (slot.index >= 0 && slot.index < rows.length) {
 							var container = jQuery('#fulltbl');
-							var row = rows.eq(slot.index);
+							var origin = jQuery('#tbl1body .epg__slot').first();
+							if (!origin.length) return;
 							var headerHeight = jQuery('.serviceheader').first().outerHeight() || 0;
-							var top = row.offset().top - container.offset().top + container.scrollTop() + row.outerHeight() * slot.fraction - headerHeight;
+							var top = origin.offset().top - container.offset().top + container.scrollTop() + EpgTime.guidePosition(targetTime, config.slotStart) - headerHeight;
 							container.animate({scrollTop: Math.max(0, top)}, 500);
 						} else if (slot.index < 0) {
 							jQuery('#fulltbl').animate({scrollTop: 0}, 500);
@@ -433,9 +450,9 @@ var reloadTimers = false;
 					var headerHeight = jQuery('.serviceheader').first().outerHeight() || 0;
 					var slot = EpgTime.slot(EpgTime.now(), config.slotStart);
 					if (slot.index >= 0 && slot.index < 12) {
-						var targetRow = jQuery('#tbl1body').find('tr').eq(slot.index);
-						if (targetRow.length) {
-							var targetY = targetRow.offset().top - containerTop + containerScroll + targetRow.outerHeight() * slot.fraction - headerHeight - (container.height() - headerHeight) * 0.3;
+						var origin = jQuery('#tbl1body .epg__slot').first();
+						if (origin.length) {
+							var targetY = origin.offset().top - containerTop + containerScroll + EpgTime.guidePosition(EpgTime.now(), config.slotStart) - headerHeight - (container.height() - headerHeight) * 0.3;
 							container.scrollTop(Math.max(0, targetY));
 						}
 					}

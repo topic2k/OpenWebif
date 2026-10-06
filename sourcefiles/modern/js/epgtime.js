@@ -5,6 +5,7 @@
 	var slotSeconds = 7200;
 	var secondsPerPixel = 6;
 	var channelWidth = 140;
+	var guideSecondsPerPixel = 15;
 
 	function now() {
 		return Date.now() / 1000;
@@ -25,6 +26,16 @@
 	function slotTime(start, index, fraction) {
 		return start + (index + fraction) * slotSeconds;
 	}
+	function interval(begin, end, start, finish, scale) {
+		if (![begin, end, start, finish, scale].every(isFinite) || scale <= 0 || end <= begin) return null;
+		var visibleStart = Math.max(begin, start);
+		var visibleEnd = Math.min(end, finish);
+		if (visibleEnd <= visibleStart) return null;
+		return {start: visibleStart, end: visibleEnd, offset: (visibleStart - start) / scale, length: (visibleEnd - visibleStart) / scale};
+	}
+	function guidePosition(timestamp, start) {
+		return (timestamp - start) / guideSecondsPerPixel;
+	}
 	function timelinePosition(timestamp, first) {
 		return channelWidth + (timestamp - first) / secondsPerPixel;
 	}
@@ -43,6 +54,7 @@
 		return labels.weekdays[date.getDay()] + ', ' + date.getDate() + '.' + labels.months[date.getMonth()] + ' ' + date.getFullYear();
 	}
 	return {now: now, dateAt: dateAt, dayStart: dayStart, slot: slot, slotTime: slotTime,
+		interval: interval, guidePosition: guidePosition, guideSecondsPerPixel: guideSecondsPerPixel,
 		timelinePosition: timelinePosition, timelineWindow: timelineWindow, dayOffset: dayOffset,
 		dateKey: dateKey, formatDate: formatDate};
 });

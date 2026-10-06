@@ -38,6 +38,7 @@ function startClock(mode = 2, day = 0, week = 0) {
 		if (selector === '.timetable-now' || selector === '.epg__tv-guide-now') return marker;
 		if (selector === '#tblinner') return {height: () => 444};
 		if (selector === '#tbl1body tr') return rows;
+		if (selector === '#tbl1body .epg__slot') return {first: () => ({length: 1, offset: () => ({top: 0})})};
 		if (selector === '#fulltbl') return {offset: () => ({top: 0}), scrollTop: () => 0};
 		if (selector === '#tbl1') return {outerWidth: () => 900};
 		if (selector === window) return events;

@@ -24,6 +24,7 @@ function runGuide(hour, minute, enabled = true, startHour = 0) {
 		if (selector === '#fulltbl') return scroller;
 		if (selector === '.serviceheader') return {first: () => ({outerHeight: () => 40})};
 		if (selector === '#tbl1body') return {find: () => ({eq: row})};
+		if (selector === '#tbl1body .epg__slot') return {first: () => row(0)};
 		throw new Error('Unexpected selector: ' + selector);
 	};
 	const FixedDate = class extends Date {
@@ -69,10 +70,11 @@ function runTimeline(marker, eventStart, enabled = true) {
 }
 
 test('Zeitschrift platziert die Uhrzeit bei 30 % des sichtbaren Zeitbereichs', () => {
-	assert.equal(runGuide(11, 0), 992);
-	assert.equal(runGuide(11, 45), 1067);
-	assert.equal(runGuide(15, 30, true, 10), 442);
-	assert.equal(runGuide(0, 30), 0);
+	assert.equal(runGuide(11, 0), 2532);
+	assert.equal(runGuide(11, 45), 2712);
+	assert.equal(runGuide(15, 30, true, 10), 1212);
+	assert.equal(runGuide(20, 47), 4880);
+	assert.equal(runGuide(0, 30), 12);
 	assert.equal(runGuide(9, 0, true, 10), 0);
 });
 

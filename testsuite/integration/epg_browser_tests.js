@@ -39,7 +39,7 @@ async function openEpg(t, mode = 1, variant = '') {
             return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><head>
                 <meta charset="utf-8"><style>${fixtures.css}</style>
                 <style>body { margin: 20px; } #epgcard { margin: 0; } .nav-tabs { display: flex; flex-wrap: wrap; }
-                #tbl1body td.border { min-width: 220px; height: 240px; } #header { display: block; }</style>
+                #tbl1body td.border { min-width: 220px; } #header { display: block; }</style>
                 <script>${fixtures.jquery}</script><script>
                     // Only the surrounding application shell is substituted; EPG scripts and jQuery.load run unchanged.
                     jQuery.fx.off = true;
@@ -47,6 +47,9 @@ async function openEpg(t, mode = 1, variant = '') {
                     var loadspinner = '<div id="spinner">Laden</div>', mepgdirect = 0;
                     function load_tvcontent_spin(url) { jQuery('#tvcontent').html(loadspinner).load(url); }
                     function SetLSValue(key, value) { localStorage.setItem(key, value); }
+                    window.eventCalls = []; window.modalCalls = [];
+                    function loadeventepg(id, ref) { window.eventCalls.push({ id, ref }); }
+                    jQuery.fn.modal = function(action, node) { window.modalCalls.push(node.dataset.metadata); return this; };
                 </script>${fixtures.assetTags}</head><body><div id="header"></div>${fixtures.shell}</body></html>` });
         }
         if (Object.hasOwn(fixtures.assets, url.pathname)) {
@@ -122,8 +125,146 @@ async function markerPosition(page, mode) {
 
 async function intervalCount(page) { return page.evaluate(() => window.epgIntervals.size); }
 
+test('Zeitstrahl: viele Sendungen behalten Zeitposition und Breite auch ohne Vorgänger', async t => {
+    const { page } = await openEpg(t, 2);
+    async function checkGeometry() {
+        const geometry = await page.locator('.eventlist').first().evaluate(list => {
+            const origin = list.getBoundingClientRect().left;
+            return Array.from(list.querySelectorAll('.event[data-begin]'), event => {
+                const rect = event.getBoundingClientRect();
+                return { id: Number(event.dataset.id), left: rect.left - origin, width: rect.width };
+            });
+        });
+        assert.ok(geometry.length > 10);
+        for (const event of geometry) {
+            assert.ok(Math.abs(event.left - (20 + event.id - 1) * 600) < 0.1, JSON.stringify(event));
+            assert.ok(Math.abs(event.width - 600) < 0.1, JSON.stringify(event));
+        }
+    }
+    await checkGeometry();
+    await page.locator('.eventlist').first().evaluate(list => {
+        list.querySelectorAll('.event').forEach((event, index) => { if (index % 3 === 0) event.remove(); });
+    });
+    await checkGeometry();
+});
+
 for (const mode of [1, 2]) {
     const view = mode === 1 ? 'Zeitschrift' : 'Zeitstrahl';
+    test(`${view}: 20:47 liegt bei 32/90 der Sendung 20:15–21:45, unabhängig vom Text`, async t => {
+        const { page } = await openEpg(t, mode, 'geometry');
+        await page.locator('[data-day="200"]').click({ force: true });
+        async function checkAlignment() {
+            const geometry = await page.evaluate(mode => {
+                const events = Array.from(document.querySelectorAll('[data-id="1001"]'));
+                const marker = document.querySelector(mode === 1 ? '.epg__tv-guide-now' : '.timetable-now').getBoundingClientRect();
+                const later = document.querySelector('[data-id="1002"]').getBoundingClientRect();
+                return events.map(event => {
+                    const rect = event.getBoundingClientRect();
+                    return mode === 1 ? { position: rect.top, size: rect.height, ratio: (marker.top - rect.top) / rect.height,
+                        later: later.top, marker: marker.top } :
+                        { position: rect.left, size: rect.width, ratio: (marker.left - rect.left) / rect.width,
+                            later: later.left, marker: marker.left };
+                });
+            }, mode);
+            assert.equal(geometry.length, 2, 'A spanning event stays one element per channel');
+            assert.equal(geometry[0].position, geometry[1].position, 'Same begin time aligns across channels');
+            for (const event of geometry) {
+                assert.ok(Math.abs(event.ratio - 32 / 90) < 0.001, JSON.stringify(event));
+                assert.equal(event.size, mode === 1 ? 360 : 900);
+                assert.ok(event.later > event.marker, '21:45 must be after the 20:47 marker');
+            }
+        }
+        await checkAlignment();
+        await page.setViewportSize({ width: 1000, height: 740 });
+        await page.clock.runFor(200);
+        await checkAlignment();
+        const zoom = await page.context().newCDPSession(page);
+        await zoom.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1.25 });
+        await checkAlignment();
+        await zoom.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
+        await page.locator('[data-id="1001"] .epg__timer-marker').first().click({ force: true });
+        assert.equal(await page.evaluate(() => window.modalCalls.length), 1);
+        assert.equal(await page.evaluate(() => window.eventCalls.length), 0, 'Timer action must not open the event');
+        await page.locator('[data-id="1001"]').first().click({ force: true,
+            position: mode === 1 ? { x: 20, y: 340 } : { x: 500, y: 20 } });
+        assert.equal(await page.evaluate(() => window.eventCalls.at(-1).id), '1001');
+        const metadata = await page.evaluate(() => JSON.parse(window.modalCalls[0]));
+        assert.equal(metadata.begin, fixtures.midnight + 20 * 3600 + 15 * 60);
+        assert.equal(metadata.end - metadata.begin, 90 * 60);
+
+        const long = page.locator('[data-id="1003"]').first();
+        const before = await long.evaluate((event, mode) => {
+            const table = document.getElementById('fulltbl');
+            const rect = event.getBoundingClientRect(), bounds = table.getBoundingClientRect();
+            return mode === 1 ? rect.top - bounds.top + table.scrollTop : rect.left - bounds.left + table.scrollLeft;
+        }, mode);
+        await page.locator('#fulltbl').evaluate((table, {mode, before}) => {
+            if (mode === 1) table.scrollTop = before + 700;
+            else table.scrollLeft = before + 900;
+            table.dispatchEvent(new Event('scroll'));
+        }, { mode, before });
+        await page.clock.runFor(200);
+        const scrolled = await long.evaluate((event, mode) => {
+            const rect = event.getBoundingClientRect(), table = document.getElementById('fulltbl');
+            const info = event.querySelector(mode === 1 ? '.epg__event-info' : '.epg__timeline-info');
+            const text = info.getBoundingClientRect(), bounds = table.getBoundingClientRect();
+            return { transform: event.style.transform, shift: info._epgShift,
+                position: mode === 1 ? rect.top - bounds.top + table.scrollTop : rect.left - bounds.left + table.scrollLeft,
+                contained: mode === 1 ? text.top >= rect.top && text.bottom <= rect.bottom + 0.1 :
+                    text.left >= rect.left && text.right <= rect.right + 0.1 };
+        }, mode);
+        assert.equal(scrolled.transform, '');
+        assert.equal(scrolled.position, before, 'Scroll must not move the time block');
+        assert.ok(scrolled.shift > 0, 'Text follows scrolling even when the originating slot is offscreen');
+        assert.ok(scrolled.contained, 'Text stays inside the event');
+
+        await page.evaluate(() => {
+            const url = document.getElementById('fulltbl').dataset.refreshUrl;
+            jQuery('#tvcontent').html(loadspinner).load(url);
+        });
+        await page.waitForSelector('[data-id="1001"]');
+        await page.clock.runFor(200);
+        await checkAlignment();
+        assert.equal(await intervalCount(page), 1);
+        await page.locator(`[data-day="${mode === 1 ? 102 : 101}"]`).click({ force: true });
+        await page.waitForSelector(mode === 1 ? '.epg__timeline' : '.epg__tv-guide');
+        await page.clock.runFor(200);
+        await page.locator(`[data-day="${mode === 1 ? 101 : 102}"]`).click({ force: true });
+        await page.waitForSelector(mode === 1 ? '.epg__tv-guide' : '.epg__timeline');
+        await page.clock.runFor(200);
+        await checkAlignment();
+        assert.equal(await intervalCount(page), 1);
+    });
+
+    test(`${view}: Lücken, kurze Sendungen sowie Slot- und Tagesgrenzen behalten ihren Maßstab`, async t => {
+        const { page } = await openEpg(t, mode, 'geometry');
+        const geometry = await page.evaluate(mode => {
+            const size = event => { const rect = event.getBoundingClientRect(); return mode === 1 ? rect.height : rect.width; };
+            const firstChannel = Array.from(mode === 1 ? document.querySelectorAll('#tbl1body tr td:first-child [data-id]') :
+                document.querySelector('.eventlist').querySelectorAll('[data-id]')).filter(event => Number(event.dataset.id) >= 1100);
+            return { clipped: size(document.querySelector('[data-id="1000"]')),
+                last: size(document.querySelector('[data-id="1004"]')),
+                spanning: size(document.querySelector('[data-id="1003"]')),
+                events: firstChannel.map(event => {
+                    const rect = event.getBoundingClientRect();
+                    return { id: Number(event.dataset.id), position: mode === 1 ? rect.top : rect.left, size: size(event) };
+                }), secondCount: Array.from(mode === 1 ? document.querySelectorAll('#tbl1body tr td:nth-child(2) [data-id]') :
+                    document.querySelectorAll('.eventlist')[1].querySelectorAll('[data-id]')).filter(event => Number(event.dataset.id) >= 1100).length,
+                empty: Array.from(document.querySelectorAll('.epg__slot')).filter(slot => !slot.querySelector('.event')).length };
+        }, mode);
+        assert.equal(geometry.clipped, mode === 1 ? 40 : 100);
+        assert.equal(geometry.last, mode === 1 ? 60 : 600);
+        assert.equal(geometry.spanning, mode === 1 ? 1200 : 3000);
+        assert.equal(geometry.events.length, 80);
+        assert.equal(geometry.secondCount, 40, 'Different event counts must not change the scale');
+        const first = geometry.events[0];
+        for (const event of geometry.events) {
+            assert.ok(Math.abs(event.position - first.position - (event.id - first.id) * (mode === 1 ? 20 : 50)) < 0.1);
+            assert.equal(event.size, mode === 1 ? 12 : 30, 'Text must not enlarge short time blocks');
+        }
+        if (mode === 1) assert.ok(geometry.empty > 0, 'Empty slots remain empty time surfaces');
+    });
+
     test(`${view}: externe Styles bleiben auf das EPG begrenzt und Konfiguration wird nicht als Skript ausgeführt`, async t => {
         const { page } = await openEpg(t, mode, 'hostile');
         const config = await page.locator('#modern-epg').evaluate(node => JSON.parse(node.dataset.epgConfig));
