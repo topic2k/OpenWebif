@@ -66,6 +66,12 @@ class BQEWebController(BaseController):
 		bqe.handleCommand(self.buildCommand('name,mode', request.args))
 		return self.returnResult(request, bqe.result)
 
+	def P_duplicatebouquet(self, request):
+		self.withMainTemplate = False
+		bqe = BouquetEditor(self.session, func=BouquetEditor.DUPLICATE_BOUQUET)
+		bqe.handleCommand(self.buildCommand('sBouquetRef', request.args))
+		return self.returnResult(request, bqe.result)
+
 	def P_removebouquet(self, request):
 		self.withMainTemplate = False
 		bqe = BouquetEditor(self.session, func=BouquetEditor.REMOVE_BOUQUET)

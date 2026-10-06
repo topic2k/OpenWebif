@@ -98,6 +98,10 @@ var reloadTimers = false;
 			return EpgTime.timelinePosition(EpgTime.now(), config.first);
 		}
 
+		function clampTimelineScroll(left) {
+			return Math.max(0, Math.min(left, tableNode.scrollWidth - tableNode.clientWidth));
+		}
+
 		function updateEpgDateRange() {
 			if (!alive()) return;
 			var container = tableNode;
@@ -130,17 +134,20 @@ var reloadTimers = false;
 				});
 			} else {
 				var first = Number(container.getAttribute('data-first'));
-				var range = EpgTime.timelineWindow(first, container.scrollLeft, container.clientWidth);
-				var start = range.start;
-				addDate(start);
-				addDate(range.end);
-				container.querySelectorAll('.epg__timeline-row').forEach(function(row) {
-					if (!visible(row.getBoundingClientRect())) return;
-					row.querySelectorAll('.eventlist .event[data-begin]').forEach(function(event) {
-						var begin = Number(event.getAttribute('data-begin'));
-						if (begin < start && Number(event.getAttribute('data-end')) > start && visible(event.getBoundingClientRect())) addDate(begin);
+				var range = EpgTime.timelineWindow(first, container.scrollLeft, container.clientWidth,
+					Number(container.getAttribute('data-timeline-end')));
+				if (range) {
+					var start = range.start;
+					addDate(start);
+					addDate(range.end);
+					container.querySelectorAll('.epg__timeline-row').forEach(function(row) {
+						if (!visible(row.getBoundingClientRect())) return;
+						row.querySelectorAll('.eventlist .event[data-begin]').forEach(function(event) {
+							var begin = Number(event.getAttribute('data-begin'));
+							if (begin < start && Number(event.getAttribute('data-end')) > start && visible(event.getBoundingClientRect())) addDate(begin);
+						});
 					});
-				});
+				}
 			}
 			var days = Object.keys(dates).map(function(key) { return dates[key]; }).sort(function(a, b) { return a - b; });
 			if (!days.length) days = [EpgTime.dateAt(config.slotStart)];
@@ -250,11 +257,16 @@ var reloadTimers = false;
 				var marker = scope.find('.timetable-now');
 				var inner = scope.find('#tblinner');
 				stopMarker = startEpgNowMarker(marker, function() {
-					marker.css({left: epgTimelineNowPosition() + 'px', height: inner.height()});
+					var now = EpgTime.now();
+					if (now < config.first || now >= config.timelineEnd) {
+						marker.hide();
+						return;
+					}
+					marker.css({left: epgTimelineNowPosition() + 'px', height: inner.height()}).show();
 				});
 			}
 		} else {
-			scope.find('.timetable-now').css('height', '0');
+			scope.find('.timetable-now').css('height', '0').hide();
 		}
 
 		var list = document.getElementById('bqlist');
@@ -389,7 +401,7 @@ var reloadTimers = false;
 						}
 					} else {
 						var pos = EpgTime.timelinePosition(targetTime, config.first);
-						if (pos > 0) jQuery('#fulltbl').animate({scrollLeft: Math.max(0, pos - 160)}, 500);
+						jQuery('#fulltbl').animate({scrollLeft: clampTimelineScroll(pos - 160)}, 500);
 					}
 				} else if (day > 100) {
 					var mode = day - 100;
@@ -484,7 +496,7 @@ var reloadTimers = false;
 				var markerLeft = epgTimelineNowPosition();
 				if (!isNaN(markerLeft)) {
 					var channelWidth = jQuery('.epg__channel-col').first().outerWidth() || 0;
-					container.scrollLeft(Math.max(0, markerLeft - channelWidth - (container.width() - channelWidth) * 0.3));
+					container.scrollLeft(clampTimelineScroll(markerLeft - channelWidth - (container.width() - channelWidth) * 0.3));
 				}
 			}
 		}

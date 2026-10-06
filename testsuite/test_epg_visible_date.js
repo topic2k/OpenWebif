@@ -14,11 +14,12 @@ function element(rect, attributes = {}, children = {}) {
 	};
 }
 
-function displayDate({ magazine, scrollTop = 0, scrollLeft = 0, width = 600, rows, disposed = false, replaced = false }) {
+function displayDate({ magazine, scrollTop = 0, scrollLeft = 0, width = 600, rows, disposed = false, replaced = false,
+	timelineEnd = stamp(3, 0) }) {
 	const source = functionSource('alive') + '\n' + functionSource('updateEpgDateRange');
 	const label = {textContent: ''};
 	const container = element({top: 100, bottom: 500, left: 0, right: width}, {
-		'data-slot-start': stamp(1, 0), 'data-first': stamp(1, 0)
+		'data-slot-start': stamp(1, 0), 'data-first': stamp(1, 0), 'data-timeline-end': timelineEnd
 	}, {
 		'#tbl1body tr': rows,
 		'.epg__event[data-begin]': rows.flatMap(row => row.querySelectorAll('.epg__event[data-begin]')),
@@ -83,4 +84,12 @@ test('beide Ansichten ändern das Datum nach Entsorgung oder Ersetzen der Tabell
 		assert.equal(displayDate({magazine, rows: [], disposed: true}), '');
 		assert.equal(displayDate({magazine, rows: [], replaced: true}), '');
 	}
+});
+
+test('Zeitstrahl zeigt hinter dem letzten Sendungsende keine erfundenen Folgetage', () => {
+	assert.equal(displayDate({magazine: false, rows: [], width: 2000,
+		scrollLeft: 23 * 600 + 45 * 10, timelineEnd: stamp(2, 0)}), 'Do, 1.Okt 2026');
+	assert.equal(displayDate({magazine: false, rows: [], timelineEnd: stamp(1, 0)}), 'Do, 1.Okt 2026');
+	assert.equal(displayDate({magazine: false, rows: [], scrollLeft: 100000,
+		timelineEnd: stamp(1, 0)}), 'Do, 1.Okt 2026');
 });

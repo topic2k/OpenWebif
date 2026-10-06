@@ -22,7 +22,6 @@ async function waitForDom(page, predicate, argument) {
 
 async function openEpg(t, mode = 1, variant = '') {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, timezoneId: 'UTC' });
-    t.after(() => context.close());
     const page = await context.newPage();
     const errors = [];
     const unexpected = [];
@@ -60,11 +59,11 @@ async function openEpg(t, mode = 1, variant = '') {
         if (url.pathname === '/ajax/multiepg') {
             const day = Number(url.searchParams.get('day') || 0);
             const week = Number(url.searchParams.get('week') || 0);
-            const key = `${mode}:${day}:${week}${variant ? ':' + variant : ''}`;
+            const bouquet = url.searchParams.get('bref');
+            if (bouquet) assert.ok([fixtures.bouquet, fixtures.otherBouquet].includes(bouquet));
+            const key = `${mode}:${day}:${week}${variant ? ':' + variant : ''}${bouquet === fixtures.otherBouquet ? ':other' : ''}`;
             const markup = fixtures.pages[key];
             assert.ok(markup, 'Missing rendered fixture for ' + key);
-            const bouquet = url.searchParams.get('bref');
-            if (bouquet) assert.equal(bouquet, fixtures.bouquet);
             loads.push({ mode, day, week });
             return route.fulfill({ contentType: 'text/html', body: markup });
         }
@@ -74,7 +73,7 @@ async function openEpg(t, mode = 1, variant = '') {
             return route.fulfill({ json: { result: true } });
         }
         if (url.pathname === '/api/epgcalendar') {
-            assert.equal(url.searchParams.get('bref'), fixtures.bouquet);
+            assert.ok([fixtures.bouquet, fixtures.otherBouquet].includes(url.searchParams.get('bref')));
             return route.fulfill({ json: { result: true, days: ['2026-09-28', '2026-09-29', '2026-10-05'] } });
         }
         if (url.pathname === '/picon.png') return route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="30"/>' });
@@ -102,7 +101,9 @@ async function openEpg(t, mode = 1, variant = '') {
     });
     await page.goto(origin);
     await page.waitForSelector('#fulltbl');
+    await waitForDom(page, () => parseFloat(document.getElementById('fulltbl')?.style.height) > 0);
     await page.clock.runFor(200);
+    t.after(() => context.close());
     return { page, loads };
 }
 
@@ -111,7 +112,7 @@ async function navigate(page, selector, expectedMode, expectedOffset) {
     await page.locator(selector).click({ force: true });
     await waitForDom(page, ({ mode, offset, midnight }) => {
         const table = document.getElementById('fulltbl');
-        return table && table !== window.previousEpgTable &&
+        return table && parseFloat(table.style.height) > 0 && table !== window.previousEpgTable &&
             table.classList.contains('epg__tv-guide') === (mode === 1) &&
             Number(table.dataset.slotStart) === midnight + offset * 86400;
     }, { mode: expectedMode, offset: expectedOffset, midnight: fixtures.midnight });
@@ -137,7 +138,7 @@ test('Zeitstrahl: viele Sendungen behalten Zeitposition und Breite auch ohne Vor
         });
         assert.ok(geometry.length > 10);
         for (const event of geometry) {
-            assert.ok(Math.abs(event.left - (20 + event.id - 1) * 600) < 0.1, JSON.stringify(event));
+            assert.ok(Math.abs(event.left - (event.id - 1) * 600) < 0.1, JSON.stringify(event));
             assert.ok(Math.abs(event.width - 600) < 0.1, JSON.stringify(event));
         }
     }
@@ -146,6 +147,118 @@ test('Zeitstrahl: viele Sendungen behalten Zeitposition und Breite auch ohne Vor
         list.querySelectorAll('.event').forEach((event, index) => { if (index % 3 === 0) event.remove(); });
     });
     await checkGeometry();
+});
+
+async function checkTimelineWidth(page) {
+    const geometry = await page.locator('#fulltbl').evaluate(table => {
+        const width = (Number(table.dataset.timelineEnd) - Number(table.dataset.first)) / 6;
+        return { actual: table.scrollWidth, expected: Math.max(table.clientWidth, width + 140),
+            rows: Array.from(table.querySelectorAll('.epg__timeline-row'), row => row.getBoundingClientRect().width) };
+    });
+    assert.ok(Math.abs(geometry.actual - geometry.expected) <= 1, JSON.stringify(geometry));
+    for (const width of geometry.rows) assert.ok(Math.abs(width - geometry.expected) <= 1, JSON.stringify(geometry));
+}
+
+for (const variant of ['geometry', 'long']) {
+    test(`Zeitstrahl: tatsächliches Ende ohne Restbereich (${variant})`, async t => {
+        const { page } = await openEpg(t, 2, variant);
+        await checkTimelineWidth(page);
+        const last = await page.locator('.eventlist').first().evaluate(list => {
+            const table = document.getElementById('fulltbl');
+            const end = Number(table.dataset.timelineEnd);
+            const event = Array.from(list.querySelectorAll('[data-end]')).find(event => Number(event.dataset.end) === end);
+            const rect = event.getBoundingClientRect();
+            return { right: rect.right - list.getBoundingClientRect().left,
+                expected: (end - Number(table.dataset.first)) / 6,
+                width: rect.width, begin: Number(event.dataset.begin), end };
+        });
+        assert.ok(Math.abs(last.right - last.expected) < 0.1, JSON.stringify(last));
+        if (variant === 'long') assert.ok(last.width > 30000, 'Long events are not clipped at 50 hours');
+        await page.locator('#fulltbl').evaluate(table => { table.scrollLeft = table.scrollWidth; });
+        const visibleEnd = await page.locator('.eventlist').first().evaluate(list => {
+            const table = document.getElementById('fulltbl');
+            const event = Array.from(list.querySelectorAll('[data-end]')).find(event => event.dataset.end === table.dataset.timelineEnd);
+            return event.getBoundingClientRect().right - table.getBoundingClientRect().right;
+        });
+        assert.ok(Math.abs(visibleEnd) <= 1, 'Final event ends at the scroll boundary');
+        await page.setViewportSize({ width: 1000, height: 740 });
+        await page.clock.runFor(200);
+        await checkTimelineWidth(page);
+        await navigate(page, '[data-day="1"]', 2, 1);
+        await checkTimelineWidth(page);
+    });
+}
+
+for (const variant of ['short', 'empty']) {
+    test(`Zeitstrahl: begrenzte Navigation und Datum bei ${variant}`, async t => {
+        const { page } = await openEpg(t, 2, variant);
+        await checkTimelineWidth(page);
+        assert.equal(await page.locator('.timetable-now').isVisible(), false, 'Now is outside the selected data');
+        assert.equal(await page.locator('#epg-date-range').textContent(), 'Mo, 28.Sep 2026');
+        for (const selector of ['#pt0', '#pt1', '#pt2', '#pt3']) {
+            await page.locator(selector).click({ force: true });
+            const scroll = await page.locator('#fulltbl').evaluate(table => ({
+                actual: table.scrollLeft, expected: table.scrollWidth - table.clientWidth
+            }));
+            assert.equal(scroll.actual, scroll.expected, 'A jump after the final event stops at the real boundary');
+            await checkTimelineWidth(page);
+        }
+        await page.evaluate(() => {
+            window.previousEpgTable = document.getElementById('fulltbl');
+            jQuery('#tvcontent').html(loadspinner).load(window.previousEpgTable.dataset.refreshUrl);
+        });
+        await waitForDom(page, () => {
+            const table = document.getElementById('fulltbl');
+            return table && table !== window.previousEpgTable && parseFloat(table.style.height) > 0;
+        });
+        await page.clock.runFor(200);
+        await checkTimelineWidth(page);
+        await page.setViewportSize({ width: 1000, height: 740 });
+        await page.clock.runFor(200);
+        await checkTimelineWidth(page);
+        await navigate(page, '[data-day="1"]', 2, 1);
+        assert.equal(await page.locator('#epg-date-range').textContent(), 'Di, 29.Sep 2026');
+        await checkTimelineWidth(page);
+        await page.locator('#epg-calendar-toggle').click({ force: true });
+        await waitForDom(page, () => document.querySelectorAll('#epg-calendar-grid button.has-epg').length === 2);
+        await page.evaluate(() => { window.previousEpgTable = document.getElementById('fulltbl'); });
+        await page.locator('#epg-calendar-grid button').filter({ hasText: /^28$/ }).click({ force: true });
+        await waitForDom(page, () => {
+            const table = document.getElementById('fulltbl');
+            return table && table !== window.previousEpgTable && parseFloat(table.style.height) > 0;
+        });
+        await page.clock.runFor(200);
+        assert.equal(await page.locator('#epg-date-range').textContent(), 'Mo, 28.Sep 2026');
+        await checkTimelineWidth(page);
+        await page.evaluate(() => { window.previousEpgTable = document.getElementById('fulltbl'); });
+        await page.locator('.bq').nth(1).click({ force: true });
+        await waitForDom(page, () => {
+            const table = document.getElementById('fulltbl');
+            return table && table !== window.previousEpgTable && parseFloat(table.style.height) > 0;
+        });
+        await page.clock.runFor(200);
+        await checkTimelineWidth(page);
+        assert.equal(await page.locator('#fulltbl').evaluate(table => table.scrollWidth - table.clientWidth), 0);
+        assert.equal(await page.locator('.timetable-now').isVisible(), false);
+    });
+}
+
+test('Zeitstrahl: Enddatum und Jetzt-Markierung erzeugen keinen zusätzlichen Scrollbereich', async t => {
+    const { page } = await openEpg(t, 2);
+    await page.locator('#fulltbl').evaluate(table => { table.scrollLeft = table.scrollWidth; });
+    await page.clock.runFor(200);
+    assert.equal(await page.locator('#epg-date-range').textContent(), 'Mo, 28.Sep 2026');
+    for (const [timestamp, visible] of [[fixtures.midnight + 86400, false], [fixtures.midnight - 1, false],
+        [fixtures.midnight + 3600, true]]) {
+        await page.clock.setSystemTime(timestamp * 1000);
+        await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+        assert.equal(await page.locator('.timetable-now').isVisible(), visible);
+        await checkTimelineWidth(page);
+    }
+    await page.clock.setSystemTime((fixtures.midnight + 86400 - 1) * 1000);
+    await page.clock.runFor(10000);
+    assert.equal(await page.locator('.timetable-now').isVisible(), false, 'The regular tick hides Now at the end');
+    await checkTimelineWidth(page);
 });
 
 for (const mode of [1, 2]) {
@@ -306,7 +419,9 @@ for (const mode of [1, 2]) {
         assert.equal(await markerPosition(page, mode), stale, 'No interval has fired after the clock change');
         await page.locator('[data-day="200"]').click({ force: true });
         const position = await page.locator('#fulltbl').evaluate((table, mode) => {
-            if (mode === 2) return { actual: table.scrollLeft, expected: (Date.now() / 1000 - Number(table.dataset.first)) / 6 - 20 };
+            if (mode === 2) return { actual: table.scrollLeft,
+                expected: Math.min(table.scrollWidth - table.clientWidth,
+                    Math.max(0, (Date.now() / 1000 - Number(table.dataset.first)) / 6 - 20)) };
             const rows = table.querySelectorAll('#tbl1body tr');
             const elapsed = Date.now() / 1000 - Number(table.dataset.slotStart);
             const row = rows[Math.floor(elapsed / 7200)];

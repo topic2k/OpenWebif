@@ -39,9 +39,15 @@
 	function timelinePosition(timestamp, first) {
 		return channelWidth + (timestamp - first) / secondsPerPixel;
 	}
-	function timelineWindow(first, left, width) {
+	function timelineWindow(first, left, width, finish) {
 		var start = first + left * secondsPerPixel;
-		return {start: start, end: start + Math.max(0, width - channelWidth) * secondsPerPixel - 1};
+		var end = start + Math.max(0, width - channelWidth) * secondsPerPixel;
+		if (typeof finish === 'number' && isFinite(finish)) {
+			start = Math.max(first, start);
+			end = Math.min(end, finish);
+			if (end <= start) return null;
+		}
+		return {start: start, end: end - 1};
 	}
 	function dayOffset(selected, today) {
 		return Math.round((Date.UTC(selected.getFullYear(), selected.getMonth(), selected.getDate()) -

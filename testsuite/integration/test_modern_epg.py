@@ -19,6 +19,7 @@ VIEWS = ROOT / 'plugin/controllers/views/responsive/ajax'
 MIDNIGHT = timegm((2026, 9, 28, 0, 0, 0))
 NOW = MIDNIGHT + 20 * 3600 + 47 * 60
 BOUQUET = '1:7:1:0:0:0:0:0:0:0:FROM BOUQUET "userbouquet.test.tv" ORDER BY bouquet'
+OTHER_BOUQUET = BOUQUET.replace('test.tv', 'other.tv')
 CONFIG_PROBE = '"><script>window.configInjected=true</script>&\'\\'
 
 
@@ -49,8 +50,8 @@ class RenderedModernEpgTests(unittest.TestCase):
             shell = str(Template(file=str(VIEWS / 'myepg.tmpl')))
             for mode in (1, 2):
                 for day, week in ((0, 0), (1, 0), (0, 1), (2, 1), (0, 2)):
-                    # Match the controller/model contract: current two-hour slot, otherwise target midnight.
-                    slot_start = MIDNIGHT + (day + week * 7) * 86400 if day or week else MIDNIGHT + 20 * 3600
+                    # The timeline always starts at midnight; the magazine keeps its current two-hour slot.
+                    slot_start = MIDNIGHT + (day + week * 7) * 86400 if mode == 2 or day or week else MIDNIGHT + 20 * 3600
                     events = {}
                     for channel in ('1:0:1:AAA:', '1:0:1:BBB:'):
                         slots = [[] for _ in range(12 if mode == 1 else 1)]
@@ -64,11 +65,13 @@ class RenderedModernEpgTests(unittest.TestCase):
                         events[channel] = slots
                     context = {
                         'mode': mode, 'day': day, 'week': week, 'epgmode': 'tv', 'bref': BOUQUET,
-                        'slot_start': slot_start, 'time': time, 'bouquets': [(BOUQUET, 'Testbouquet')],
+                        'slot_start': slot_start, 'time': time, 'bouquets': [(BOUQUET, 'Testbouquet'), (OTHER_BOUQUET, 'Anderes Bouquet')],
                         'events': events, 'channelnames': dict.fromkeys(events, 'Gleicher Sendername'),
                         'channelrefs': {ref: ref for ref in events}, 'picons': dict.fromkeys(events, '/picon.png'),
                         'epg_jump_now': 0, 'epg_jump_active_service': 0, 'current_service_ref': '',
                     }
+                    if mode == 2:
+                        context.update(timeline_start=slot_start, timeline_end=slot_start + 86400)
                     fixtures['%d:%d:%d' % (mode, day, week)] = str(template(searchList=[context]))
                     context['current_service_ref'] = CONFIG_PROBE
                     fixtures['%d:%d:%d:hostile' % (mode, day, week)] = str(template(searchList=[context]))
@@ -83,7 +86,9 @@ class RenderedModernEpgTests(unittest.TestCase):
                             (1003, base + 22 * 3600, 5 * 3600),
                             (1004, slot_start + 86400 - 900, 3600),
                         ]
-                        intervals.extend((1100 + index, base + 27 * 3600 + 600 + index * 300, 180)
+                        if mode == 2:
+                            intervals.append((1005, base + 86400, (4 - channel_index) * 3600))
+                        intervals.extend((1100 + index, base + (27 if mode == 1 else 8) * 3600 + 600 + index * 300, 180)
                                          for index in range(80))
                         for event_id, begin, duration in intervals:
                             if channel_index and event_id >= 1100:
@@ -103,7 +108,30 @@ class RenderedModernEpgTests(unittest.TestCase):
                                 slots[slot].append(event)
                         geometry_events[channel] = slots
                     context.update(events=geometry_events, current_service_ref='')
+                    if mode == 2:
+                        context['timeline_end'] = base + 28 * 3600
                     fixtures['%d:%d:%d:geometry' % (mode, day, week)] = str(template(searchList=[context]))
+                    if mode == 2:
+                        short_event = {'id': 2001, 'ref': next(iter(events)), 'begin_timestamp': base,
+                                       'duration': 3 * 3600, 'title': 'Kurzer Tag', 'shortdesc': '',
+                                       'timerStatus': '', 'timer': None}
+                        context.update(events={short_event['ref']: [[short_event]]}, timeline_end=base + 3 * 3600,
+                                       epg_jump_now=1, epg_jump_active_service=1, current_service_ref=short_event['ref'])
+                        fixtures['%d:%d:%d:short' % (mode, day, week)] = str(template(searchList=[context]))
+                        context['epg_jump_now'] = 0
+                        long_event = {'id': 2000, 'ref': next(iter(events)), 'begin_timestamp': base - 3 * 86400,
+                                      'duration': 7 * 86400 + 1, 'title': 'Mehrtägige Sendung', 'shortdesc': '',
+                                      'timerStatus': '', 'timer': None}
+                        context.update(events={long_event['ref']: [[long_event]]}, timeline_end=base + 4 * 86400 + 1)
+                        fixtures['%d:%d:%d:long' % (mode, day, week)] = str(template(searchList=[context]))
+                        context.update(events={}, timeline_end=base)
+                        fixtures['%d:%d:%d:empty' % (mode, day, week)] = str(template(searchList=[context]))
+                        short_event = {**short_event, 'duration': 1800}
+                        context.update(events={short_event['ref']: [[short_event]]}, timeline_end=base + 1800,
+                                       bref=OTHER_BOUQUET)
+                        other = str(template(searchList=[context]))
+                        for variant in ('', ':short', ':long', ':empty', ':geometry'):
+                            fixtures['%d:%d:%d%s:other' % (mode, day, week, variant)] = other
 
         main = (VIEWS.parent / 'main.tmpl').read_text(encoding='utf-8')
         assets = {}
@@ -117,7 +145,7 @@ class RenderedModernEpgTests(unittest.TestCase):
             assets[url] = (ROOT / 'plugin/public/modern' / name).read_text(encoding='utf-8')
         self.assertLess(main.index('/modern/js/epgtime.min.js'), main.index('/modern/js/responsive-multiepg.min.js'))
 
-        data = {'now': NOW * 1000, 'midnight': MIDNIGHT, 'bouquet': BOUQUET,
+        data = {'now': NOW * 1000, 'midnight': MIDNIGHT, 'bouquet': BOUQUET, 'otherBouquet': OTHER_BOUQUET,
                 'shell': shell, 'pages': fixtures, 'configProbe': CONFIG_PROBE,
                 'assets': assets, 'assetTags': '\n'.join(asset_tags),
                 'jquery': (ROOT / 'plugin/public/js/jquery-2.2.4.min.js').read_text(encoding='utf-8'),

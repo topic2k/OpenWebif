@@ -9,8 +9,14 @@
 
 #set $epgTime = $getEpgTimeContext($slot_start)
 #set $first = $epgTime['first']
+#if $mode == 2
+	#set $first = $timeline_start
+#end if
 #set $now = $epgClock.time()
 #set $epgConfig = {'mode': $mode, 'day': $day, 'week': $week, 'epgmode': $epgmode, 'bref': $quote($bref), 'slotStart': $slot_start, 'first': $first, 'dateLabels': $getEpgDateLabels($tstrings), 'jumpNow': $epg_jump_now, 'jumpActiveService': $epg_jump_active_service, 'currentServiceRef': $current_service_ref}
+#if $mode == 2
+	#set $epgConfig['timelineEnd'] = $timeline_end
+#end if
 <div id="modern-epg" class="modern-epg#if $mode == 2 then ' modern-epg--timeline' else '' #" data-epg-config="$escape($dumps($epgConfig, separators=(',', ':')), quote=True)">
 <div id="navepg">
 <ul class="nav nav-tabs tab--skinned">
@@ -103,7 +109,8 @@
 </div>
 
 #else
-<div id="fulltbl" class="responsive-table epg__timeline" data-slot-start="$slot_start" data-first="$first" data-refresh-url="ajax/multiepg?bref=$quote($bref)&amp;day=$day&amp;epgmode=$epgmode&amp;week=$week">
+#set $timelineWidth = ($timeline_end - $first) / 6
+<div id="fulltbl" class="responsive-table epg__timeline" data-slot-start="$slot_start" data-first="$first" data-timeline-end="$timeline_end" style="--epg-timeline-width:${timelineWidth}px;" data-refresh-url="ajax/multiepg?bref=$quote($bref)&amp;day=$day&amp;epgmode=$epgmode&amp;week=$week">
 	<div id="tblinner">
 		<div class="timetable">
 			<div class="timetable-now"></div>
@@ -124,7 +131,7 @@
 	#set $ref = quote(event['ref'], safe=' ~@#$()*!+=:;,.?/\'')
 	#set $end = $event.begin_timestamp + $event.duration
 	#set $visibleBegin = max($event.begin_timestamp, $first)
-	#set $visibleEnd = min($end, $first + 30000 * 6)
+	#set $visibleEnd = min($end, $timeline_end)
 	#if $visibleEnd <= $visibleBegin
 		#continue
 	#end if

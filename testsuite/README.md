@@ -8,6 +8,8 @@ Die Workflows `build.yml` (Push auf `main`) und `pull.yml` (Pull Requests gegen 
 
 Für lokale Gesamtläufe werden `CT3` (Cheetah), `requests` und Node.js benötigt. Installation der Python-Abhängigkeiten: `python -m pip install CT3 requests`. Node.js muss auch für den Python-Testlauf verfügbar sein, da einzelne Tests JavaScript-Unterprozesse prüfen. Die JavaScript-Tests benötigen keine npm-Installation. Die Muster `test_*.py` und `test_*.js` nehmen neue reguläre Tests automatisch auf; manuelle Receiver-Prüfskripte werden nicht gestartet. In der CI ist `OPENWEBIF_ALLOW_HARDWARE_TESTS=NO` gesetzt.
 
+Die Sommerzeit-Tests verwenden `zoneinfo` mit `Europe/Berlin`. Auf Systemen ohne IANA-Zeitzonendaten (insbesondere Windows) zusätzlich `python -m pip install tzdata` installieren.
+
 ## Gerenderte moderne EPG-Integration
 
 Der zusätzliche Pflichtjob `epg-integration` im gemeinsamen Test-Workflow prüft die Zeitschrift und den Zeitstrahl mit Python 3.13, Node.js 22 und Chromium. Cheetah rendert die vollständigen Templates `myepg.tmpl` und `multiepg.tmpl` samt produktiven Render-Helfern; der Browser lädt die in `main.tmpl` eingebundenen externen EPG-Skripte und Styles aus `plugin/public/modern` mit dem mitgelieferten jQuery. Keine JavaScript-Funktionen werden aus Templates extrahiert. Die klassischen EPG-Templates werden weder geladen noch verändert.

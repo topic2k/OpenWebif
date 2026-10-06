@@ -1212,8 +1212,18 @@ def getMultiEpg(self, ref, begintime=-1, endtime=None, mode=1, modern=False):
 	ret = OrderedDict()
 	channelnames = {}
 	channelrefs = {}
+	timeline = modern and mode == 2
+	timeline_context = {}
+	if timeline:
+		bt = localtime(time() if begintime == -1 else begintime)
+		begintime = int(mktime((bt.tm_year, bt.tm_mon, bt.tm_mday, 0, 0, 0, -1, -1, -1)))
+		day_end = int(mktime((bt.tm_year, bt.tm_mon, bt.tm_mday + 1, 0, 0, 0, -1, -1, -1)))
+		timeline_context = {'timeline_start': begintime, 'timeline_end': begintime}
 	services = eServiceCenter.getInstance().list(eServiceReference(ref))
 	if not services:
+		if timeline:
+			return {"events": ret, "channelnames": channelnames, "channelrefs": channelrefs, "result": False,
+				"picons": {}, "slot_start": begintime, **timeline_context}
 		return {"events": ret, "channelnames": channelnames, "channelrefs": channelrefs, "result": False, "slot": None, "slot_start": 0}
 
 	srefs = services.getContent('S')
@@ -1227,15 +1237,40 @@ def getMultiEpg(self, ref, begintime=-1, endtime=None, mode=1, modern=False):
 			bt = localtime(t)
 			begintime = int(mktime((bt.tm_year, bt.tm_mon, bt.tm_mday, 0, 0, 0, -1, -1, -1)))
 
-	epgevents = epg.getMultiChannelEvents(srefs, begintime, endtime)
-	offset = None
+	if timeline:
+		day_events = epg.getMultiChannelEvents(srefs, begintime, (day_end - begintime) // 60 + 1) or []
+		midnight_events = epg.getMultiChannelEvents(srefs, begintime) or []
+		selected = OrderedDict()
+		seen = set()
+		for event in day_events + midnight_events:
+			if not event or len(event) < 7 or not isinstance(event[1], int) or not isinstance(event[6], int):
+				continue
+			if not isinstance(event[4], str) or not event[4] or event[6] <= 0:
+				continue
+			if event[1] > day_end or event[1] + event[6] <= begintime:
+				continue
+			key = (event[4], event[0], event[1])
+			if key in seen:
+				continue
+			seen.add(key)
+			selected.setdefault(event[4], []).append(event)
+		channel_order = {sref: index for index, sref in enumerate(srefs)}
+		epgevents = [event for sref in sorted(selected, key=lambda sref: channel_order.get(sref, len(srefs)))
+			for event in sorted(selected[sref], key=lambda event: event[1])]
+		timeline_context['timeline_end'] = max((event[1] + event[6] for event in epgevents), default=begintime)
+	else:
+		epgevents = epg.getMultiChannelEvents(srefs, begintime, endtime)
+	offset = begintime if timeline else None
 	picons = {}
 
 	if epgevents is not None:
 		# If a start time is requested, show all events in a 24 hour frame
-		bt = localtime(begintime)
-		offset = mktime((bt.tm_year, bt.tm_mon, bt.tm_mday, bt.tm_hour - bt.tm_hour % 2, 0, 0, -1, -1, -1))
-		lastevent = offset + 86399
+		if timeline:
+			lastevent = timeline_context['timeline_end']
+		else:
+			bt = localtime(begintime)
+			offset = mktime((bt.tm_year, bt.tm_mon, bt.tm_mday, bt.tm_hour - bt.tm_hour % 2, 0, 0, -1, -1, -1))
+			lastevent = offset + 86399
 
 		# We want to display if an event has a matching timer.
 		# To keep the costs low for a nested loop against the timer list, we
@@ -1245,12 +1280,14 @@ def getMultiEpg(self, ref, begintime=-1, endtime=None, mode=1, modern=False):
 		timerlist = {}
 		timers = self.session.nav.RecordTimer.timer_list + self.session.nav.RecordTimer.processed_timers
 		timer_start = offset if modern else begintime
+		if timeline:
+			timer_start = min((event[1] for event in epgevents), default=offset)
 		for timer in timers:
 			event_begin = getattr(timer, 'eventBegin', None)
 			if timer.begin <= lastevent and (
 				timer.end >= timer_start or
 				(modern and getattr(timer, 'repeated', 0)) or
-				(modern and timer.justplay and event_begin is not None and offset <= event_begin <= lastevent)
+				(modern and timer.justplay and event_begin is not None and timer_start <= event_begin <= lastevent)
 			):
 				if str(timer.service_ref) not in timerlist:
 					timerlist[str(timer.service_ref)] = []
@@ -1331,7 +1368,8 @@ def getMultiEpg(self, ref, begintime=-1, endtime=None, mode=1, modern=False):
 					ret[channel][slot].append(ev)
 			else:
 				ret[channel][0].append(ev)
-	return {"events": ret, "channelnames": channelnames, "channelrefs": channelrefs, "result": True, "picons": picons, "slot_start": int(offset) if offset is not None else 0}
+	return {"events": ret, "channelnames": channelnames, "channelrefs": channelrefs, "result": True, "picons": picons,
+		"slot_start": int(offset) if offset is not None else 0, **timeline_context}
 
 
 def getPicon(sname, pp=None, defaultpicon=True):

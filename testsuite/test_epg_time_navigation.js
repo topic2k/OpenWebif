@@ -40,7 +40,8 @@ function jumpToTime(day, startHour = 0, primeTimeHour = {201: 6, 202: 12, 203: 2
 	return scroller.position;
 }
 
-function jumpOnTimeline(day, now = 37800, first = 0, targetTime = {201: 6, 202: 12, 203: 20}[day] * 3600) {
+function jumpOnTimeline(day, now = 37800, first = 0, targetTime = {201: 6, 202: 12, 203: 20}[day] * 3600,
+	scrollWidth = 30140, clientWidth = 600) {
 	const code = callbackSource("scope.find('.plusclick').click(");
 	const scroller = {animate(value) { this.position = value.scrollLeft; }};
 	const jQuery = selector => {
@@ -49,8 +50,8 @@ function jumpOnTimeline(day, now = 37800, first = 0, targetTime = {201: 6, 202: 
 		if (selector === '.timetable-now') return {css: () => '450px'};
 		throw new Error('Unexpected selector: ' + selector);
 	};
-	runScript(functionSource('epgTimelineNowPosition') + '\n(' + code + ').call({});', {
-		jQuery, Date: {now: () => now * 1000}, config: {mode: 2, first}
+	runScript(functionSource('clampTimelineScroll') + '\n(' + code + ').call({});', {
+		jQuery, Date: {now: () => now * 1000}, config: {mode: 2, first}, tableNode: {scrollWidth, clientWidth}
 	});
 	return scroller.position;
 }
@@ -97,4 +98,11 @@ test('beide Ansichten verwenden den serverseitigen data-time-Wert statt einer fe
 test('Zeitstrahl berücksichtigt den konfigurierten Tagesbeginn für Primetime und Jetzt', () => {
 	assert.equal(jumpOnTimeline(202, 37800, 3600), 6580);
 	assert.equal(jumpOnTimeline(200, 37800, 3600), 5680);
+});
+
+test('Zeitstrahl begrenzt Uhrzeit- und Jetzt-Sprünge auf den tatsächlichen Scrollbereich', () => {
+	assert.equal(jumpOnTimeline(203, 37800, 0, 72000, 2000, 600), 1400);
+	assert.equal(jumpOnTimeline(200, 37800, 0, 0, 2000, 600), 1400);
+	assert.equal(jumpOnTimeline(203, 37800, 0, 72000, 600, 600), 0);
+	assert.equal(jumpOnTimeline(201, 37800, 86400), 0);
 });

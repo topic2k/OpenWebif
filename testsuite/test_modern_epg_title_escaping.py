@@ -77,6 +77,9 @@ class ModernEpgTitleEscapingTests(unittest.TestCase):
             'channelrefs': {'Channel': event['ref']}, 'picons': {'Channel': '/picon'},
             'epg_jump_now': 0, 'epg_jump_active_service': 0, 'current_service_ref': '',
         }
+        if mode == 2:
+            context.update(timeline_start=event['begin_timestamp'],
+                           timeline_end=event['begin_timestamp'] + event['duration'])
         markup = str(self.template(searchList=[context]))
         parser = EpgTitleParser()
         parser.feed(markup)

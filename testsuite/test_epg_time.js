@@ -68,6 +68,15 @@ test('timeline windows exclude the channel column and end before the next visibl
 	assert.deepEqual(EpgTime.timelineWindow(10000, 0, 0), {start: 10000, end: 9999});
 });
 
+test('bounded timeline windows never include time after the final selected event', () => {
+	assert.deepEqual(EpgTime.timelineWindow(10000, 0, 600, 11000), {start: 10000, end: 10999});
+	assert.deepEqual(EpgTime.timelineWindow(10000, 600, 600, 15000), {start: 13600, end: 14999});
+	assert.deepEqual(EpgTime.timelineWindow(10000, 0, 600, 190000), EpgTime.timelineWindow(10000, 0, 600));
+	assert.equal(EpgTime.timelineWindow(10000, 0, 600, 10000), null);
+	assert.equal(EpgTime.timelineWindow(10000, 600, 600, 11000), null);
+	assert.equal(EpgTime.timelineWindow(10000, 0, 140, 11000), null);
+});
+
 test('date conversion, keys, labels and day starts use the local calendar', () => {
 	const date = new Date(2026, 9, 1, 18, 30, 15, 250);
 	const timestamp = date.getTime() / 1000;

@@ -40,7 +40,7 @@ function runGuide(hour, minute, enabled = true, startHour = 0) {
 	return scroller.position || 0;
 }
 
-function runTimeline(marker, eventStart, enabled = true) {
+function runTimeline(marker, eventStart, enabled = true, scrollWidth = 30140) {
 	const scroller = {
 		scrollLeft(value) {
 			if (value !== undefined) this.position = value;
@@ -61,8 +61,10 @@ function runTimeline(marker, eventStart, enabled = true) {
 		if (selector === '.epg__channel-col') return {first: () => ({outerWidth: () => 140})};
 		throw new Error('Unexpected selector: ' + selector);
 	};
-	const context = runScript(jumpConfig + functionSource('epgTimelineNowPosition') + '\n' + functionSource('autoJumpTimeline'), {
+	const context = runScript(jumpConfig + functionSource('epgTimelineNowPosition') + '\n' +
+		functionSource('clampTimelineScroll') + '\n' + functionSource('autoJumpTimeline'), {
 		jQuery: $, Date: {now: () => 4560000},
+		tableNode: {scrollWidth, clientWidth: 600},
 		config: {day: 0, first: 0, jumpNow: enabled, jumpActiveService: false, currentServiceRef: ''}
 	});
 	context.autoJumpTimeline();
@@ -90,4 +92,9 @@ test('Automatischer Jetzt-Sprung im Zeitstrahl ignoriert eine veraltete Markieru
 test('Bei ausgeschalteter Option bleibt die Startposition unverändert', () => {
 	assert.equal(runGuide(11, 0, false), 0);
 	assert.equal(runTimeline(900, 300, false), 0);
+});
+
+test('Automatischer Jetzt-Sprung bleibt in kurzen und leeren Zeitstrahlen begrenzt', () => {
+	assert.equal(runTimeline(900, null, true, 800), 200);
+	assert.equal(runTimeline(900, null, true, 600), 0);
 });
