@@ -11,79 +11,100 @@ jobs:
     uses: ./.github/workflows/tests.yml
 
   build:
+    name: Compatibility checks and package build
     needs: tests
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - name: Check out source for compatibility checks
+        uses: actions/checkout@v7
         with:
           ref: 'main'
 
-      - uses: actions/setup-python@v7
+      - name: Set up Python 3.14 for compatibility checks
+        uses: actions/setup-python@v7
         with:
           python-version: '3.14'
 
-      - name: Build python 3.14
+      - name: Check Python 3.14 compatibility (OpenATV 8.0)
         run: |
           pip3 install CT3
           python -m compileall -l . -r 10 -q
           cheetah compile -R plugin
           python testsuite/evil_eval.py
 
-      - uses: actions/setup-python@v7
+      - name: Set up Python 3.13 for compatibility checks
+        uses: actions/setup-python@v7
         with:
           python-version: '3.13'
 
-      - name: Build python 3.13
+      - name: Check Python 3.13 compatibility (OpenATV 7.6)
         run: |
           pip3 install CT3
           python -m compileall -l . -r 10 -q
           cheetah compile -R plugin
           python testsuite/evil_eval.py
-  
-      - uses: actions/setup-python@v7
+
+      - name: Set up Python 3.12 for compatibility checks
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
-      - name: Build python 3.12
+      - name: Check Python 3.12 compatibility
         run: |
           pip3 install CT3
           python -m compileall -l . -r 10 -q
           cheetah compile -R plugin
           python testsuite/evil_eval.py
 
-      - uses: actions/setup-python@v7
+      - name: Set up Python 3.11 for compatibility checks
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
 
-      - name: Build python 3.11
+      - name: Check Python 3.11 compatibility
         run: |
           pip3 install CT3
           python -m compileall -l . -r 10 -q
           cheetah compile -R plugin
           python testsuite/evil_eval.py
 
-      - uses: actions/setup-python@v7
+      - name: Set up Python 3.10 for compatibility checks
+        uses: actions/setup-python@v7
         with:
           python-version: '3.10'
 
-      - name: Build python 3.10
+      - name: Check Python 3.10 compatibility
         run: |
           pip3 install CT3
           python -m compileall -l . -r 10 -q
           cheetah compile -R plugin
           python testsuite/evil_eval.py
 
-      - uses: actions/checkout@v7
+      - name: Set up Python 3.9 for compatibility checks
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.9'
+
+      - name: Check Python 3.9 compatibility
+        run: |
+          pip3 install CT3
+          python -m compileall -l . -r 10 -q
+          cheetah compile -R plugin
+          python testsuite/evil_eval.py
+
+      - name: Check out clean source and full history for packaging
+        uses: actions/checkout@v7
         with:
           ref: 'main'
           fetch-depth: 0
 
-      - uses: actions/setup-python@v7
+      - name: Set up Python 3.14 for packaging
+        uses: actions/setup-python@v7
         with:
-          python-version: '3.9'
+          python-version: '3.14'
 
-      - name: Build python 3.9
+      - name: Install package and documentation build dependencies
         run: |
           sudo apt-get -q update
           sudo apt-get install -y closure-compiler nodejs npm dos2unix gettext python3-sphinx
@@ -96,11 +117,13 @@ jobs:
           pip3 install sphinxcontrib-napoleon
           pip3 install sphinxcontrib-websupport
           pip3 install sphinxcontrib-httpdomain
-          python -m compileall -l . -r 10 -q
-          cheetah compile -R plugin
-          python testsuite/evil_eval.py
+
+      - name: Prepare OpenWebif sources and build web assets
+        run: |
           ./CI/build.sh
 
+      - name: Create IPK package (Python 3.14)
+        run: |
           ./CI/create_ipk.sh
           export PKG1=$(ls -1 .dist/*_all.ipk)
           mkdir Rel
@@ -110,13 +133,16 @@ jobs:
           export PKG1=$(ls -1 *_all.ipk)
           ln -s "${PKG1}" enigma2-plugin-extensions-openwebif_latest_all.ipk
           cd ..
+
+      - name: Build HTML documentation
+        run: |
           cd doc
           make html
           cd build/html
           mv * ../../../Rel/
           cd ../../../
 
-      - name: Upload build artifacts
+      - name: Upload IPK package and HTML documentation
         uses: actions/upload-artifact@v7
         with:
           name: openwebif-build
